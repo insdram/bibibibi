@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  bibibibi:
+    build: .
+    ports:
+      - "3030:8080"
+    volumes:
+      - bibibibi-data:/data
+    restart: unless-stopped
+
+volumes:
+  bibibibi-data:

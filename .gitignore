@@ -1,0 +1,26 @@
+# 二进制文件
+bibibibi
+
+# 数据库文件
+*.db
+
+# 环境变量
+.env
+
+# 日志文件
+*.log
+
+# 临时文件
+tmp/
+temp/
+
+# IDE 配置
+.vscode/
+.idea/
+
+# 依赖目录
+node_modules/
+vendor/
+
+# 构建产物
+web/dist/
