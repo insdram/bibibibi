@@ -262,7 +262,7 @@ const Home: React.FC = () => {
   );
 
   const renderCardFooter = (bibi: Bibi) => (
-    <div className="flex items-center justify-between border-t pt-3 mt-3">
+    <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
       <Space size={16}>
         <Button
           type="text"
