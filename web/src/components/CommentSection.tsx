@@ -247,7 +247,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
       </div>
 
       {replyTo && (
-        <div className="border-t pt-4 mb-4">
+        <div className="border-t border-[#f0f0f0] dark:border-[#303030] pt-4 mb-4">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-sm text-blue-500 dark:text-blue-400">回复 @{replyTo.name}</span>
             <Button type="text" size="small" onClick={handleCancelReply}>
@@ -301,7 +301,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
         </div>
       )}
 
-      <div className="border-t pt-4">
+      <div className="border-t border-[#f0f0f0] dark:border-[#303030] pt-4">
         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">发表评论</h4>
         <Space direction="vertical" size={12} className="w-full">
           <div className="flex gap-3">
