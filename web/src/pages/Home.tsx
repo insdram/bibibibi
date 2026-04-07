@@ -515,6 +515,18 @@ const Home: React.FC = () => {
             </div>
           </div>
           <Input value={API_ADDRESS} disabled addonBefore={<ApiOutlined />} />
+
+          {user && (
+            <div className="mt-4">
+              <div className="font-medium dark:text-white mb-1">认证 Token</div>
+              <Input.TextArea
+                value={localStorage.getItem('token') || ''}
+                disabled
+                autoSize={{ minRows: 2, maxRows: 4 }}
+                style={{ resize: 'none' }}
+              />
+            </div>
+          )}
         </div>
 
         {user?.is_admin && (
