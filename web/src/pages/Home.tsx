@@ -510,26 +510,35 @@ const Home: React.FC = () => {
           overflow: 'auto',
         }}
       >
-        <div style={{ padding: '24px 16px', textAlign: 'center' }}>
-          <Avatar
-            size={64}
-            src={user?.avatar}
-            style={{ marginBottom: 12 }}
-          >
-            {!user?.avatar && (user?.nickname?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'U')}
-          </Avatar>
-            <div style={{ fontWeight: 500, marginBottom: 4, color: 'rgba(255,255,255,0.85)' }}>{user?.nickname || user?.username}</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>@{user?.username}</div>
-        </div>
+        {user && (
+          <div style={{ padding: '24px 16px', textAlign: 'center' }}>
+            <Avatar
+              size={64}
+              src={user?.avatar}
+              style={{ marginBottom: 12 }}
+            >
+              {!user?.avatar && (user?.nickname?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'U')}
+            </Avatar>
+              <div style={{ fontWeight: 500, marginBottom: 4, color: 'rgba(255,255,255,0.85)' }}>{user?.nickname || user?.username}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>@{user?.username}</div>
+          </div>
+        )}
 
         <Button
           type="primary"
-          icon={<PlusOutlined />}
+          icon={user ? <PlusOutlined /> : <UserOutlined />}
           size="large"
-          style={{ margin: '0 16px 24px', width: 'calc(100% - 32px)' }}
-          onClick={() => { setShowEditor(true); setActiveTab('home'); }}
+          style={{ margin: user ? '0 16px 24px' : '24px 16px', width: 'calc(100% - 32px)' }}
+          onClick={() => {
+            if (user) {
+              setShowEditor(true);
+              setActiveTab('home');
+            } else {
+              navigate('/login');
+            }
+          }}
         >
-          发布
+          {user ? '发布' : '登录'}
         </Button>
 
         <Menu
@@ -544,11 +553,13 @@ const Home: React.FC = () => {
           }))}
         />
 
-        <div style={{ position: 'absolute', bottom: 24, left: 0, right: 0, padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.14)' }}>
-          <Button type="text" block onClick={handleLogout} style={{ textAlign: 'left', color: 'rgba(255,255,255,0.65)' }}>
-            退出登录
-          </Button>
-        </div>
+        {user && (
+          <div style={{ position: 'absolute', bottom: 24, left: 0, right: 0, padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.14)' }}>
+            <Button type="text" block onClick={handleLogout} style={{ textAlign: 'left', color: 'rgba(255,255,255,0.65)' }}>
+              退出登录
+            </Button>
+          </div>
+        )}
       </Sider>
 
       <Layout style={{ marginLeft: 240 }}>

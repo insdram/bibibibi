@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Input, Button, Avatar, List, Space, message } from 'antd';
 import { SendOutlined, CommentOutlined } from '@ant-design/icons';
 import { commentApi } from '../api';
+import { useAuth } from '../stores/AuthContext';
 
 const { TextArea } = Input;
 
@@ -31,6 +32,7 @@ interface CommentSectionProps {
 }
 
 const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpdate }) => {
+  const { user } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [website, setWebsite] = useState('');
@@ -43,18 +45,23 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
   const [replyContent, setReplyContent] = useState('');
 
   useEffect(() => {
-    const savedInfo = localStorage.getItem(COMMENT_INFO_KEY);
-    if (savedInfo) {
-      try {
-        const info: CommentInfo = JSON.parse(savedInfo);
-        setName(info.name || '');
-        setEmail(info.email || '');
-        setWebsite(info.website || '');
-      } catch (e) {
-        console.error('Failed to parse saved comment info', e);
+    if (user) {
+      setName(user.nickname || user.username);
+      setEmail(user.email || '');
+    } else {
+      const savedInfo = localStorage.getItem(COMMENT_INFO_KEY);
+      if (savedInfo) {
+        try {
+          const info: CommentInfo = JSON.parse(savedInfo);
+          setName(info.name || '');
+          setEmail(info.email || '');
+          setWebsite(info.website || '');
+        } catch (e) {
+          console.error('Failed to parse saved comment info', e);
+        }
       }
     }
-  }, []);
+  }, [user]);
 
   const saveCommentInfo = (info: CommentInfo) => {
     localStorage.setItem(COMMENT_INFO_KEY, JSON.stringify(info));
