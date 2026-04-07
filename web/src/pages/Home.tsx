@@ -136,15 +136,19 @@ const Home: React.FC = () => {
   };
 
   const handleToggleLike = async (id: number) => {
+    const bibi = bibis.find(b => b.id === id);
+    if (bibi?.liked) {
+      message.warning('已点赞，无需重复点赞');
+      return;
+    }
     try {
       const response = await bibiApi.toggleLike(id);
       const { liked } = response.data;
-      // 乐观更新
       setBibis((prev) =>
-        prev.map((bibi) =>
-          bibi.id === id
-            ? { ...bibi, like_count: liked ? bibi.like_count + 1 : bibi.like_count - 1, liked }
-            : bibi
+        prev.map((b) =>
+          b.id === id
+            ? { ...b, like_count: liked ? b.like_count + 1 : b.like_count - 1, liked }
+            : b
         )
       );
     } catch (error) {
