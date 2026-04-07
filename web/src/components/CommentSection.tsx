@@ -48,6 +48,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
     if (user) {
       setName(user.nickname || user.username);
       setEmail(user.email || '');
+      setWebsite(user.website || '');
     } else {
       const savedInfo = localStorage.getItem(COMMENT_INFO_KEY);
       if (savedInfo) {
