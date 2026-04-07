@@ -83,6 +83,6 @@ export const systemApi = {
   getPublicSettings: () =>
     client.get('/public/settings'),
   
-  updateSettings: (data: { registration_enabled?: boolean }) =>
+  updateSettings: (data: { registration_enabled?: boolean; gravatar_source?: string }) =>
     client.put('/settings', data),
 };

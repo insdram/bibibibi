@@ -61,6 +61,7 @@ const Home: React.FC = () => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
+  const [gravatarSource, setGravatarSource] = useState('https://www.gravatar.com/avatar/');
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [form] = Form.useForm();
 
@@ -116,6 +117,7 @@ const Home: React.FC = () => {
     try {
       const response = await systemApi.getSettings();
       setRegistrationEnabled(response.data.registration_enabled);
+      setGravatarSource(response.data.gravatar_source || 'https://www.gravatar.com/avatar/');
     } catch (error) {
       console.error('获取设置失败:', error);
     }
@@ -124,8 +126,21 @@ const Home: React.FC = () => {
   const handleUpdateRegistration = async (enabled: boolean) => {
     setSettingsLoading(true);
     try {
-      await systemApi.updateSettings({ registration_enabled: enabled });
+      await systemApi.updateSettings({ registration_enabled: enabled, gravatar_source: gravatarSource });
       setRegistrationEnabled(enabled);
+      message.success('设置已更新');
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '更新失败');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const handleUpdateGravatarSource = async (source: string) => {
+    setSettingsLoading(true);
+    try {
+      await systemApi.updateSettings({ registration_enabled: registrationEnabled, gravatar_source: source });
+      setGravatarSource(source);
       message.success('设置已更新');
     } catch (error: any) {
       message.error(error.response?.data?.error || '更新失败');
@@ -516,6 +531,31 @@ const Home: React.FC = () => {
                 loading={settingsLoading}
                 onChange={handleUpdateRegistration}
               />
+            </div>
+
+            <Divider />
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <div className="font-medium dark:text-white">Gravatar 头像源</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">用于生成用户和评论的头像</div>
+                </div>
+              </div>
+              <Space.Compact style={{ width: '100%' }}>
+                <Input
+                  value={gravatarSource}
+                  onChange={(e) => setGravatarSource(e.target.value)}
+                  placeholder="https://www.gravatar.com/avatar/"
+                  style={{ flex: 1 }}
+                />
+                <Button type="primary" loading={settingsLoading} onClick={() => handleUpdateGravatarSource(gravatarSource)}>
+                  保存
+                </Button>
+              </Space.Compact>
+              <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                常用镜像：https://cdn.v2ex.com/gravatar/ 或 https://gravatar.loli.la/avatar/
+              </div>
             </div>
           </>
         )}

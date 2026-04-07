@@ -82,9 +82,14 @@ func (c *Comment) AfterFind() error {
 
 // GetGravatarURL 根据邮箱生成 Gravatar URL
 func GetGravatarURL(email string) string {
+	return GetGravatarURLWithSource(email, "https://www.gravatar.com/avatar/")
+}
+
+// GetGravatarURLWithSource 根据邮箱和自定义源生成 Gravatar URL
+func GetGravatarURLWithSource(email, source string) string {
 	email = strings.TrimSpace(strings.ToLower(email))
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(email)))
-	return fmt.Sprintf("https://www.gravatar.com/avatar/%s?s=80&d=identicon", hash)
+	return fmt.Sprintf("%s%s?s=80&d=identicon", source, hash)
 }
 
 // Like 点赞模型

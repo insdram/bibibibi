@@ -14,6 +14,23 @@ import (
 
 var jwtSecret = []byte("bibibibi-secret-key")
 
+// getGravatarSource 获取 Gravatar 源地址
+func getGravatarSource() string {
+	source, err := systemService.GetSetting("gravatar_source")
+	if err != nil || source == "" {
+		return "https://www.gravatar.com/avatar/"
+	}
+	return source
+}
+
+// generateAvatar 生成头像 URL
+func generateAvatar(email string) string {
+	if email == "" {
+		return ""
+	}
+	return model.GetGravatarURLWithSource(email, getGravatarSource())
+}
+
 // UserService 用户服务
 type UserService struct{}
 
@@ -52,10 +69,7 @@ func (s *UserService) Register(username, password, nickname, email string) (*mod
 	}
 
 	// 生成 Gravatar 头像
-	avatar := ""
-	if email != "" {
-		avatar = getGravatarURL(email)
-	}
+	avatar := generateAvatar(email)
 
 	user := model.User{
 		Username: username,
@@ -154,7 +168,7 @@ func (s *UserService) UpdateUser(id uint, username, nickname, email, website, pa
 
 	if email != "" {
 		user.Email = email
-		user.Avatar = getGravatarURL(email)
+		user.Avatar = generateAvatar(email)
 	}
 
 	if website != "" {

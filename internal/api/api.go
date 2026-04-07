@@ -574,15 +574,21 @@ func handleDeleteComment(c *gin.Context) {
 // handleGetSettings 获取系统设置
 func handleGetSettings(c *gin.Context) {
 	registrationEnabled, _ := systemService.GetSetting("registration_enabled")
+	gravatarSource, _ := systemService.GetSetting("gravatar_source")
+	if gravatarSource == "" {
+		gravatarSource = "https://www.gravatar.com/avatar/"
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"registration_enabled": registrationEnabled == "true",
+		"gravatar_source":      gravatarSource,
 	})
 }
 
 // handleUpdateSettings 更新系统设置
 func handleUpdateSettings(c *gin.Context) {
 	var req struct {
-		RegistrationEnabled *bool `json:"registration_enabled"`
+		RegistrationEnabled *bool   `json:"registration_enabled"`
+		GravatarSource      *string `json:"gravatar_source"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -601,13 +607,25 @@ func handleUpdateSettings(c *gin.Context) {
 		}
 	}
 
+	if req.GravatarSource != nil && *req.GravatarSource != "" {
+		if err := systemService.UpdateSetting("gravatar_source", *req.GravatarSource); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "更新设置失败"})
+			return
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
 }
 
 // handleGetPublicSettings 获取公开系统设置（无需登录）
 func handleGetPublicSettings(c *gin.Context) {
 	registrationEnabled, _ := systemService.GetSetting("registration_enabled")
+	gravatarSource, _ := systemService.GetSetting("gravatar_source")
+	if gravatarSource == "" {
+		gravatarSource = "https://www.gravatar.com/avatar/"
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"registration_enabled": registrationEnabled == "true",
+		"gravatar_source":      gravatarSource,
 	})
 }

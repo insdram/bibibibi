@@ -37,8 +37,13 @@ func InitDB(dbPath string) error {
 	// 初始化系统设置
 	var setting model.SystemSetting
 	if err := DB.Where("setting_key = ?", "registration_enabled").First(&setting).Error; err != nil {
-		// 默认开启注册
 		DB.Create(&model.SystemSetting{SettingKey: "registration_enabled", SettingValue: "true"})
+	}
+
+	// 初始化 Gravatar 源（默认使用 v2ex 镜像）
+	var gravatarSource model.SystemSetting
+	if err := DB.Where("setting_key = ?", "gravatar_source").First(&gravatarSource).Error; err != nil {
+		DB.Create(&model.SystemSetting{SettingKey: "gravatar_source", SettingValue: "https://cdn.v2ex.com/gravatar/"})
 	}
 
 	return nil
