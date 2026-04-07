@@ -547,7 +547,7 @@ const Home: React.FC = () => {
               <Input.TextArea
                 value={localStorage.getItem('token') || ''}
                 disabled
-                autoSize={{ minRows: 2, maxRows: 4 }}
+                rows={1}
                 style={{ resize: 'none' }}
               />
             </div>
