@@ -19,6 +19,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string, nickname?: string, email?: string) => Promise<void>;
   logout: () => void;
+  setToken: (token: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -80,6 +81,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('token');
   };
 
+  const setAuthToken = (newToken: string | null) => {
+    setToken(newToken);
+    if (newToken) {
+      localStorage.setItem('token', newToken);
+    } else {
+      localStorage.removeItem('token');
+    }
+  };
+
   const value: AuthContextType = {
     user,
     token,
@@ -87,6 +97,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     register,
     logout,
+    setToken: setAuthToken,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

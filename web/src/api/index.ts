@@ -73,6 +73,9 @@ export const userApi = {
   
   updateCurrentUser: (data: { username?: string; nickname?: string; email?: string; website?: string; password?: string }) =>
     client.put('/user/me', data),
+  
+  refreshToken: () =>
+    client.post('/user/refresh-token'),
 };
 
 // 系统设置相关

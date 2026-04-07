@@ -34,6 +34,7 @@ func RegisterRoutes(r *gin.Engine) {
 		{
 			user.GET("/me", authMiddleware(), handleGetCurrentUser)
 			user.PUT("/me", authMiddleware(), handleUpdateCurrentUser)
+			user.POST("/refresh-token", authMiddleware(), handleRefreshToken)
 		}
 
 		// Bibi 相关
@@ -161,6 +162,19 @@ func handleLogin(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"token": token, "user": user})
+}
+
+// handleRefreshToken 刷新 Token
+func handleRefreshToken(c *gin.Context) {
+	userID := c.GetUint("userID")
+
+	newToken, err := userService.RefreshToken(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "刷新 Token 失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"token": newToken})
 }
 
 // handleRegister 处理注册请求

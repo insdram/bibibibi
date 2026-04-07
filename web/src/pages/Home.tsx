@@ -46,7 +46,7 @@ interface UserInfo {
 }
 
 const Home: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, setToken } = useAuth();
   const { darkMode, themeMode, setThemeMode } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -63,6 +63,7 @@ const Home: React.FC = () => {
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [gravatarSource, setGravatarSource] = useState('https://weavatar.com/avatar/');
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const [refreshTokenLoading, setRefreshTokenLoading] = useState(false);
   const [form] = Form.useForm();
 
   const fetchBibis = async () => {
@@ -146,6 +147,20 @@ const Home: React.FC = () => {
       message.error(error.response?.data?.error || '更新失败');
     } finally {
       setSettingsLoading(false);
+    }
+  };
+
+  const handleRefreshToken = async () => {
+    setRefreshTokenLoading(true);
+    try {
+      const response = await userApi.refreshToken();
+      const newToken = response.data.token;
+      setToken(newToken);
+      message.success('Token 已刷新');
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '刷新失败');
+    } finally {
+      setRefreshTokenLoading(false);
     }
   };
 
@@ -518,7 +533,17 @@ const Home: React.FC = () => {
 
           {user && (
             <div className="mt-4">
-              <div className="font-medium dark:text-white mb-1">认证 Token</div>
+              <div className="flex items-center justify-between mb-1">
+                <div className="font-medium dark:text-white">认证 Token</div>
+                <Button
+                  type="link"
+                  size="small"
+                  loading={refreshTokenLoading}
+                  onClick={handleRefreshToken}
+                >
+                  刷新
+                </Button>
+              </div>
               <Input.TextArea
                 value={localStorage.getItem('token') || ''}
                 disabled
