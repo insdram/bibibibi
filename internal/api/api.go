@@ -45,7 +45,7 @@ func RegisterRoutes(r *gin.Engine) {
 			bibis.DELETE("/:id", authMiddleware(), handleDeleteBibi)
 			bibis.POST("/:id/pin", authMiddleware(), handleTogglePin)
 			bibis.GET("/search", handleSearchBibis)
-			bibis.POST("/:id/like", authMiddleware(), handleToggleLike)
+			bibis.POST("/:id/like", handleToggleLike)
 
 			// 评论相关
 			bibis.GET("/:id/comments", handleGetComments)
