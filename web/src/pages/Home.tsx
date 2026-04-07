@@ -392,7 +392,7 @@ const Home: React.FC = () => {
                   {renderCardContent(bibi)}
                   {renderCardFooter(bibi)}
                   {expandedComments === bibi.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="mt-4 pt-4 border-t border-[#f0f0f0] dark:border-[#303030]">
                       <CommentSection
                         bibiId={bibi.id}
                         comments={bibi.comments || []}
