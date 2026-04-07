@@ -5,7 +5,7 @@ import type { MenuProps } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { bibiApi, userApi } from '../api';
+import { bibiApi, userApi, systemApi } from '../api';
 import { useAuth } from '../stores/AuthContext';
 import { useTheme } from '../stores/ThemeContext';
 import CommentSection from '../components/CommentSection';
@@ -40,6 +40,8 @@ interface UserInfo {
   username: string;
   nickname: string;
   email: string;
+  website?: string;
+  is_admin?: boolean;
   avatar: string;
 }
 
@@ -58,6 +60,8 @@ const Home: React.FC = () => {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+  const [settingsLoading, setSettingsLoading] = useState(false);
   const [form] = Form.useForm();
 
   const fetchBibis = async () => {
@@ -101,6 +105,34 @@ const Home: React.FC = () => {
       fetchUserInfo();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'settings' && user?.is_admin) {
+      fetchSettings();
+    }
+  }, [activeTab, user?.is_admin]);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await systemApi.getSettings();
+      setRegistrationEnabled(response.data.registration_enabled);
+    } catch (error) {
+      console.error('获取设置失败:', error);
+    }
+  };
+
+  const handleUpdateRegistration = async (enabled: boolean) => {
+    setSettingsLoading(true);
+    try {
+      await systemApi.updateSettings({ registration_enabled: enabled });
+      setRegistrationEnabled(enabled);
+      message.success('设置已更新');
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '更新失败');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
 
   const handleCreateBibi = async (content: string, visibility: string, tagIds: number[]) => {
     try {
@@ -472,6 +504,24 @@ const Home: React.FC = () => {
           </div>
           <Input value={API_ADDRESS} disabled addonBefore={<ApiOutlined />} />
         </div>
+
+        {user?.is_admin && (
+          <>
+            <Divider />
+
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium dark:text-white">开放注册</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">允许新用户注册账号</div>
+              </div>
+              <Switch
+                checked={registrationEnabled}
+                loading={settingsLoading}
+                onChange={handleUpdateRegistration}
+              />
+            </div>
+          </>
+        )}
 
         {user && (
           <>

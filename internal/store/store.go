@@ -28,9 +28,17 @@ func InitDB(dbPath string) error {
 		&model.BibiTag{},
 		&model.Comment{},
 		&model.Like{},
+		&model.SystemSetting{},
 	)
 	if err != nil {
 		return err
+	}
+
+	// 初始化系统设置
+	var setting model.SystemSetting
+	if err := DB.Where("setting_key = ?", "registration_enabled").First(&setting).Error; err != nil {
+		// 默认开启注册
+		DB.Create(&model.SystemSetting{SettingKey: "registration_enabled", SettingValue: "true"})
 	}
 
 	return nil

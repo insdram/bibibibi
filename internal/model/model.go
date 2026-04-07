@@ -16,6 +16,7 @@ type User struct {
 	Nickname  string    `json:"nickname" gorm:"size:64"`
 	Website   string    `json:"website" gorm:"size:255"`
 	Avatar    string    `json:"avatar" gorm:"size:255"`
+	IsAdmin   bool      `json:"is_admin" gorm:"default:false"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -92,4 +93,11 @@ type Like struct {
 	BibiID    uint      `json:"bibi_id" gorm:"index;not null"`
 	UserID    uint      `json:"user_id" gorm:"index;not null"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// SystemSetting 系统设置模型
+type SystemSetting struct {
+	ID          uint   `json:"id" gorm:"primaryKey"`
+	SettingKey  string `json:"setting_key" gorm:"uniqueIndex;size:64;not null"`
+	SettingValue string `json:"setting_value" gorm:"size:255"`
 }

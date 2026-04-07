@@ -15,6 +15,7 @@ var (
 	tagService     = service.NewTagService()
 	commentService = service.NewCommentService()
 	likeService    = service.NewLikeService()
+	systemService  = service.NewSystemService()
 )
 
 // RegisterRoutes 注册 API 路由
@@ -67,6 +68,14 @@ func RegisterRoutes(r *gin.Engine) {
 			comments.PUT("/:id", handleUpdateComment)
 			comments.DELETE("/:id", handleDeleteComment)
 		}
+
+		// 系统设置（仅管理员）
+		settings := api.Group("/settings")
+		settings.Use(adminMiddleware())
+		{
+			settings.GET("", handleGetSettings)
+			settings.PUT("", handleUpdateSettings)
+		}
 	}
 }
 
@@ -88,6 +97,39 @@ func authMiddleware() gin.HandlerFunc {
 		userID, err := userService.ParseToken(token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的认证令牌"})
+			c.Abort()
+			return
+		}
+
+		c.Set("userID", userID)
+		c.Next()
+	}
+}
+
+// adminMiddleware 管理员认证中间件
+func adminMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := c.GetHeader("Authorization")
+		if token == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "未提供认证令牌"})
+			c.Abort()
+			return
+		}
+
+		if len(token) > 7 && token[:7] == "Bearer " {
+			token = token[7:]
+		}
+
+		userID, err := userService.ParseToken(token)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的认证令牌"})
+			c.Abort()
+			return
+		}
+
+		user, err := userService.GetUserByID(userID)
+		if err != nil || !user.IsAdmin {
+			c.JSON(http.StatusForbidden, gin.H{"error": "需要管理员权限"})
 			c.Abort()
 			return
 		}
@@ -524,4 +566,37 @@ func handleDeleteComment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
+}
+
+// handleGetSettings 获取系统设置
+func handleGetSettings(c *gin.Context) {
+	registrationEnabled, _ := systemService.GetSetting("registration_enabled")
+	c.JSON(http.StatusOK, gin.H{
+		"registration_enabled": registrationEnabled == "true",
+	})
+}
+
+// handleUpdateSettings 更新系统设置
+func handleUpdateSettings(c *gin.Context) {
+	var req struct {
+		RegistrationEnabled *bool `json:"registration_enabled"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误"})
+		return
+	}
+
+	if req.RegistrationEnabled != nil {
+		value := "false"
+		if *req.RegistrationEnabled {
+			value = "true"
+		}
+		if err := systemService.UpdateSetting("registration_enabled", value); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "更新设置失败"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
 }

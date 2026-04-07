@@ -7,6 +7,7 @@ interface User {
   nickname: string;
   email: string;
   website?: string;
+  is_admin?: boolean;
   avatar: string;
   created_at: string;
 }

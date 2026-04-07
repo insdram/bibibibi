@@ -26,11 +26,24 @@ func NewUserService() *UserService {
 func (s *UserService) Register(username, password, nickname, email string) (*model.User, error) {
 	db := store.GetDB()
 
+	// 检查注册是否开启
+	var setting model.SystemSetting
+	if err := db.Where("setting_key = ?", "registration_enabled").First(&setting).Error; err == nil {
+		if setting.SettingValue == "false" {
+			return nil, errors.New("注册已关闭")
+		}
+	}
+
 	// 检查用户名是否已存在
 	var existingUser model.User
 	if err := db.Where("username = ?", username).First(&existingUser).Error; err == nil {
 		return nil, errors.New("用户名已存在")
 	}
+
+	// 检查是否第一个用户
+	var userCount int64
+	db.Model(&model.User{}).Count(&userCount)
+	isFirstUser := userCount == 0
 
 	// 加密密码
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -50,6 +63,7 @@ func (s *UserService) Register(username, password, nickname, email string) (*mod
 		Email:    email,
 		Nickname: nickname,
 		Avatar:   avatar,
+		IsAdmin:  isFirstUser,
 	}
 
 	if err := db.Create(&user).Error; err != nil {

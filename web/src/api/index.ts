@@ -71,6 +71,15 @@ export const userApi = {
   getCurrentUser: () =>
     client.get('/user/me'),
   
-  updateCurrentUser: (data: { username?: string; nickname?: string; email?: string; password?: string }) =>
+  updateCurrentUser: (data: { username?: string; nickname?: string; email?: string; website?: string; password?: string }) =>
     client.put('/user/me', data),
+};
+
+// 系统设置相关
+export const systemApi = {
+  getSettings: () =>
+    client.get('/settings'),
+  
+  updateSettings: (data: { registration_enabled?: boolean }) =>
+    client.put('/settings', data),
 };
