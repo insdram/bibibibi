@@ -16,7 +16,7 @@ func NewLikeService() *LikeService {
 	return &LikeService{}
 }
 
-// ToggleLike 切换点赞状态
+// ToggleLike 点赞（不可取消）
 func (s *LikeService) ToggleLike(bibiID, userID uint) (bool, error) {
 	db := store.GetDB()
 
@@ -29,38 +29,17 @@ func (s *LikeService) ToggleLike(bibiID, userID uint) (bool, error) {
 		return false, err
 	}
 
-	// 检查是否已经点赞
-	var existingLike model.Like
-	err := db.Where("bibi_id = ? AND user_id = ?", bibiID, userID).First(&existingLike).Error
-
-	if err == nil {
-		// 已经点赞
-		if userID == 0 {
-			// 匿名用户不允许取消点赞
-			return true, nil
-		}
-		// 登录用户可以取消点赞
-		if err := db.Delete(&existingLike).Error; err != nil {
-			return false, err
-		}
-		// 减少点赞数
-		db.Exec("UPDATE bibis SET like_count = like_count - 1 WHERE id = ?", bibiID)
-		return false, nil
-	} else if errors.Is(err, gorm.ErrRecordNotFound) {
-		// 没有点赞，添加点赞
-		like := model.Like{
-			BibiID: bibiID,
-			UserID:  userID,
-		}
-		if err := db.Create(&like).Error; err != nil {
-			return false, err
-		}
-		// 增加点赞数
-		db.Exec("UPDATE bibis SET like_count = like_count + 1 WHERE id = ?", bibiID)
-		return true, nil
+	// 添加点赞
+	like := model.Like{
+		BibiID: bibiID,
+		UserID:  userID,
 	}
-
-	return false, err
+	if err := db.Create(&like).Error; err != nil {
+		return false, err
+	}
+	// 增加点赞数
+	db.Exec("UPDATE bibis SET like_count = like_count + 1 WHERE id = ?", bibiID)
+	return true, nil
 }
 
 // GetLikeStatus 获取用户对笔记的点赞状态

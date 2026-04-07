@@ -136,23 +136,30 @@ const Home: React.FC = () => {
   };
 
   const handleToggleLike = async (id: number) => {
-    const bibi = bibis.find(b => b.id === id);
-    if (bibi?.liked) {
-      message.warning('已点赞，无需重复点赞');
-      return;
+    const LIKE_COOLDOWN = 10000;
+    const lastLikeKey = `bibibibi_like_${id}`;
+    const lastLikeTime = localStorage.getItem(lastLikeKey);
+    
+    if (lastLikeTime) {
+      const elapsed = Date.now() - parseInt(lastLikeTime, 10);
+      if (elapsed < LIKE_COOLDOWN) {
+        message.warning('已点赞，无需重复点赞');
+        return;
+      }
     }
+    
     try {
-      const response = await bibiApi.toggleLike(id);
-      const { liked } = response.data;
+      await bibiApi.toggleLike(id);
+      localStorage.setItem(lastLikeKey, Date.now().toString());
       setBibis((prev) =>
         prev.map((b) =>
           b.id === id
-            ? { ...b, like_count: liked ? b.like_count + 1 : b.like_count - 1, liked }
+            ? { ...b, like_count: b.like_count + 1, liked: true }
             : b
         )
       );
     } catch (error) {
-      console.error('切换点赞状态失败:', error);
+      console.error('点赞失败:', error);
     }
   };
 
