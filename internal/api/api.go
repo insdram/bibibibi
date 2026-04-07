@@ -159,6 +159,7 @@ func handleUpdateCurrentUser(c *gin.Context) {
 		Username string `json:"username"`
 		Nickname string `json:"nickname"`
 		Email    string `json:"email"`
+		Website  string `json:"website"`
 		Password string `json:"password"`
 	}
 
@@ -167,7 +168,7 @@ func handleUpdateCurrentUser(c *gin.Context) {
 		return
 	}
 
-	user, err := userService.UpdateUser(userID, req.Username, req.Nickname, req.Email, req.Password)
+	user, err := userService.UpdateUser(userID, req.Username, req.Nickname, req.Email, req.Website, req.Password)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

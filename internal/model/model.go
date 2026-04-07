@@ -14,6 +14,7 @@ type User struct {
 	Password  string    `json:"-" gorm:"size:255;not null"`
 	Email     string    `json:"email" gorm:"size:255"`
 	Nickname  string    `json:"nickname" gorm:"size:64"`
+	Website   string    `json:"website" gorm:"size:255"`
 	Avatar    string    `json:"avatar" gorm:"size:255"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

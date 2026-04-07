@@ -6,6 +6,7 @@ interface User {
   username: string;
   nickname: string;
   email: string;
+  website?: string;
   avatar: string;
   created_at: string;
 }

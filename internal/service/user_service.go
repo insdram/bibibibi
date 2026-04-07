@@ -118,7 +118,7 @@ func (s *UserService) ParseToken(tokenString string) (uint, error) {
 }
 
 // UpdateUser 更新用户信息
-func (s *UserService) UpdateUser(id uint, username, nickname, email, password string) (*model.User, error) {
+func (s *UserService) UpdateUser(id uint, username, nickname, email, website, password string) (*model.User, error) {
 	db := store.GetDB()
 	var user model.User
 	if err := db.First(&user, id).Error; err != nil {
@@ -141,6 +141,10 @@ func (s *UserService) UpdateUser(id uint, username, nickname, email, password st
 	if email != "" {
 		user.Email = email
 		user.Avatar = getGravatarURL(email)
+	}
+
+	if website != "" {
+		user.Website = website
 	}
 
 	if password != "" {

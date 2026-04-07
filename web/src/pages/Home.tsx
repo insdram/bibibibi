@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Card, Avatar, Button, Space, Tag, Dropdown, message, Pagination, Spin, List, Tabs, Form, Input, Divider, Switch, Modal, Menu, Segmented } from 'antd';
-import { PlusOutlined, MessageOutlined, MoreOutlined, DeleteOutlined, PushpinOutlined, LockOutlined, HomeOutlined, UserOutlined, UserOutlined as ProfileIcon, MailOutlined, LockOutlined as PasswordIcon, SmileOutlined, LikeOutlined, LikeFilled, SettingOutlined, MoonOutlined, SunOutlined, ApiOutlined, DeleteOutlined as ClearOutlined } from '@ant-design/icons';
+import { PlusOutlined, MessageOutlined, MoreOutlined, DeleteOutlined, PushpinOutlined, LockOutlined, HomeOutlined, UserOutlined, UserOutlined as ProfileIcon, MailOutlined, LockOutlined as PasswordIcon, SmileOutlined, LikeOutlined, LikeFilled, SettingOutlined, MoonOutlined, SunOutlined, ApiOutlined, DeleteOutlined as ClearOutlined, GlobeOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
@@ -89,6 +89,7 @@ const Home: React.FC = () => {
         username: response.data.username,
         nickname: response.data.nickname,
         email: response.data.email,
+        website: response.data.website || '',
       });
     } catch (error) {
       console.error('获取用户信息失败:', error);
@@ -163,7 +164,7 @@ const Home: React.FC = () => {
     }
   };
 
-  const handleUpdateProfile = async (values: { username: string; nickname: string; email: string; password?: string }) => {
+  const handleUpdateProfile = async (values: { username: string; nickname: string; email: string; website?: string; password?: string }) => {
     setUpdateLoading(true);
     try {
       const response = await userApi.updateCurrentUser(values);
@@ -394,6 +395,13 @@ const Home: React.FC = () => {
             ]}
           >
             <Input prefix={<MailOutlined />} placeholder="邮箱" />
+          </Form.Item>
+
+          <Form.Item
+            name="website"
+            label="网址"
+          >
+            <Input prefix={<GlobeOutlined />} placeholder="个人网站或博客地址" />
           </Form.Item>
 
           <Divider>修改密码（不修改请留空）</Divider>
