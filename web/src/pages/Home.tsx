@@ -326,12 +326,7 @@ const Home: React.FC = () => {
 
   const renderEmpty = () => (
     <div className="text-center py-16">
-      <div className="text-gray-400 dark:text-gray-500 mb-4">还没有动态</div>
-      {user && (
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowEditor(true)}>
-          发布第一条
-        </Button>
-      )}
+      <div className="text-gray-400 dark:text-gray-500">还没有动态</div>
     </div>
   );
 
