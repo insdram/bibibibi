@@ -40,10 +40,10 @@ func InitDB(dbPath string) error {
 		DB.Create(&model.SystemSetting{SettingKey: "registration_enabled", SettingValue: "true"})
 	}
 
-	// 初始化 Gravatar 源（默认使用 v2ex 镜像）
+	// 初始化 Gravatar 源（默认使用 weavatar 镜像）
 	var gravatarSource model.SystemSetting
 	if err := DB.Where("setting_key = ?", "gravatar_source").First(&gravatarSource).Error; err != nil {
-		DB.Create(&model.SystemSetting{SettingKey: "gravatar_source", SettingValue: "https://cdn.v2ex.com/gravatar/"})
+		DB.Create(&model.SystemSetting{SettingKey: "gravatar_source", SettingValue: "https://weavatar.com/avatar/"})
 	}
 
 	return nil

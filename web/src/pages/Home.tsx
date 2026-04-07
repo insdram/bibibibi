@@ -61,7 +61,7 @@ const Home: React.FC = () => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
-  const [gravatarSource, setGravatarSource] = useState('https://www.gravatar.com/avatar/');
+  const [gravatarSource, setGravatarSource] = useState('https://weavatar.com/avatar/');
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [form] = Form.useForm();
 
@@ -554,7 +554,7 @@ const Home: React.FC = () => {
                 </Button>
               </Space.Compact>
               <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                常用镜像：https://cdn.v2ex.com/gravatar/ 或 https://gravatar.loli.la/avatar/
+                常用镜像：https://weavatar.com/avatar/ 或 https://cdn.v2ex.com/gravatar/
               </div>
             </div>
           </>

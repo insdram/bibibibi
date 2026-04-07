@@ -40,7 +40,7 @@ func (s *SystemService) UpdateSetting(key, value string) error {
 func GetGravatarSource() string {
 	source, err := NewSystemService().GetSetting("gravatar_source")
 	if err != nil || source == "" {
-		return "https://www.gravatar.com/avatar/"
+		return "https://weavatar.com/avatar/"
 	}
 	return source
 }
