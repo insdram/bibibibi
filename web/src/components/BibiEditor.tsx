@@ -156,7 +156,8 @@ const BibiEditor: React.FC<BibiEditorProps> = ({ onSubmit, onCancel }) => {
             </Space>
           ) : (
             <Tag
-              style={{ cursor: 'pointer', background: '#f0f0f0', borderStyle: 'dashed' }}
+              className="cursor-pointer dark:!bg-gray-700 dark:!border-gray-600 dark:!text-gray-300"
+              style={{ background: '#f0f0f0', borderStyle: 'dashed' }}
               onClick={() => setShowTagInput(true)}
             >
               <PlusOutlined /> 新标签

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Input, Button, Avatar, List, Space, message } from 'antd';
-import { SendOutlined, CommentOutlined } from '@ant-design/icons';
+import { Input, Button, Avatar, List, Space, message, Popconfirm } from 'antd';
+import { SendOutlined, CommentOutlined, DeleteOutlined } from '@ant-design/icons';
 import { commentApi } from '../api';
 import { useAuth } from '../stores/AuthContext';
 
@@ -29,9 +29,10 @@ interface CommentSectionProps {
   bibiId: number;
   comments: Comment[];
   onUpdate: () => void;
+  isOwner?: boolean;
 }
 
-const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpdate }) => {
+const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpdate, isOwner }) => {
   const { user } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -133,6 +134,17 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
     setReplyContent('');
   };
 
+  const handleDeleteComment = async (commentId: number) => {
+    try {
+      await commentApi.deleteComment(commentId);
+      message.success('删除成功');
+      onUpdate();
+    } catch (error) {
+      console.error('删除评论失败:', error);
+      message.error('删除失败');
+    }
+  };
+
   const handleSetReplyInfo = () => {
     if (name.trim()) setReplyName(name.trim());
     if (email.trim()) setReplyEmail(email.trim());
@@ -161,7 +173,27 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
           className="text-gray-400 dark:text-gray-500"
         >
           回复
-        </Button>
+        </Button>,
+        isOwner && (
+          <Popconfirm
+            key="delete"
+            title="删除评论"
+            description="确定要删除这条评论吗？"
+            onConfirm={() => handleDeleteComment(comment.id)}
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+          >
+            <Button
+              type="text"
+              size="small"
+              icon={<DeleteOutlined />}
+              className="text-gray-400 dark:text-gray-500"
+            >
+              删除
+            </Button>
+          </Popconfirm>
+        ),
       ]}
     >
       <Space align="start" size={12}>

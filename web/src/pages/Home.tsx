@@ -338,6 +338,7 @@ const Home: React.FC = () => {
                         bibiId={bibi.id}
                         comments={bibi.comments || []}
                         onUpdate={fetchBibis}
+                        isOwner={user?.id === bibi.creator.id}
                       />
                     </div>
                   )}
