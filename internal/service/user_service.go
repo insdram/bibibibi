@@ -14,21 +14,12 @@ import (
 
 var jwtSecret = []byte("bibibibi-secret-key")
 
-// getGravatarSource 获取 Gravatar 源地址
-func getGravatarSource() string {
-	source, err := systemService.GetSetting("gravatar_source")
-	if err != nil || source == "" {
-		return "https://www.gravatar.com/avatar/"
-	}
-	return source
-}
-
 // generateAvatar 生成头像 URL
 func generateAvatar(email string) string {
 	if email == "" {
 		return ""
 	}
-	return model.GetGravatarURLWithSource(email, getGravatarSource())
+	return model.GetGravatarURLWithSource(email, GetGravatarSource())
 }
 
 // UserService 用户服务

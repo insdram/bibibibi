@@ -35,3 +35,12 @@ func (s *SystemService) UpdateSetting(key, value string) error {
 	setting.SettingValue = value
 	return db.Save(&setting).Error
 }
+
+// GetGravatarSource 获取 Gravatar 源地址
+func GetGravatarSource() string {
+	source, err := NewSystemService().GetSetting("gravatar_source")
+	if err != nil || source == "" {
+		return "https://www.gravatar.com/avatar/"
+	}
+	return source
+}
