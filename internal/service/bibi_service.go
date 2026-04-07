@@ -11,6 +11,20 @@ func getAvatarURL(email string) string {
 	return getGravatarURL(email)
 }
 
+// regenerateCreatorAvatar 重新生成创建者的头像
+func regenerateCreatorAvatar(bibi *model.Bibi) {
+	if bibi.Creator.Email != "" {
+		bibi.Creator.Avatar = getAvatarURL(bibi.Creator.Email)
+	}
+}
+
+// regenerateCreatorAvatars 批量重新生成创建者的头像
+func regenerateCreatorAvatars(bibis []model.Bibi) {
+	for i := range bibis {
+		regenerateCreatorAvatar(&bibis[i])
+	}
+}
+
 // BibiService 笔记服务
 type BibiService struct{}
 
@@ -61,6 +75,9 @@ func (s *BibiService) CreateBibi(creatorID uint, content, visibility string, tag
 		return nil, err
 	}
 
+	// 重新生成创建者头像
+	regenerateCreatorAvatar(&bibi)
+
 	// 为评论设置 Gravatar 头像
 	for j := range bibi.Comments {
 		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
@@ -76,6 +93,9 @@ func (s *BibiService) GetBibiByID(id uint) (*model.Bibi, error) {
 	if err := db.Preload("Creator").Preload("Tags").Preload("Comments").First(&bibi, id).Error; err != nil {
 		return nil, err
 	}
+	// 重新生成创建者头像
+	regenerateCreatorAvatar(&bibi)
+
 	// 为评论设置 Gravatar 头像
 	for j := range bibi.Comments {
 		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
@@ -109,6 +129,9 @@ func (s *BibiService) GetBibis(page, pageSize int, visibility string) ([]model.B
 		Find(&bibis).Error; err != nil {
 		return nil, 0, err
 	}
+
+	// 重新生成创建者头像
+	regenerateCreatorAvatars(bibis)
 
 	// 为评论设置 Gravatar 头像
 	for i := range bibis {
@@ -170,6 +193,9 @@ func (s *BibiService) UpdateBibi(id uint, content, visibility string, tagIDs []u
 		return nil, err
 	}
 
+	// 重新生成创建者头像
+	regenerateCreatorAvatar(&bibi)
+
 	// 为评论设置 Gravatar 头像
 	for j := range bibi.Comments {
 		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
@@ -221,6 +247,9 @@ func (s *BibiService) TogglePin(id uint) (*model.Bibi, error) {
 		return nil, err
 	}
 
+	// 重新生成创建者头像
+	regenerateCreatorAvatar(&bibi)
+
 	// 为评论设置 Gravatar 头像
 	for j := range bibi.Comments {
 		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
@@ -250,6 +279,9 @@ func (s *BibiService) SearchBibis(keyword string, page, pageSize int) ([]model.B
 		Find(&bibis).Error; err != nil {
 		return nil, 0, err
 	}
+
+	// 重新生成创建者头像
+	regenerateCreatorAvatars(bibis)
 
 	// 为评论设置 Gravatar 头像
 	for i := range bibis {
