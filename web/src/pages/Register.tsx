@@ -1,13 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../stores/AuthContext';
-import { Form, Input, Button, Card, message } from 'antd';
+import { Form, Input, Button, Card, message, Alert } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined, SmileOutlined } from '@ant-design/icons';
+import { systemApi } from '../api';
 
 const Register: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const { register } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await systemApi.getSettings();
+        setRegistrationEnabled(response.data.registration_enabled);
+      } catch (error) {
+        console.error('获取设置失败:', error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const onFinish = async (values: { username: string; password: string; nickname?: string; email: string }) => {
     setLoading(true);
@@ -35,11 +49,22 @@ const Register: React.FC = () => {
           <p style={{ marginTop: 8 }}>注册账号</p>
         </div>
 
+        {!registrationEnabled && (
+          <Alert
+            message="注册已关闭"
+            description="暂不开放新用户注册，请联系管理员。"
+            type="warning"
+            showIcon
+            style={{ marginBottom: 24 }}
+          />
+        )}
+
         <Form
           name="register"
           onFinish={onFinish}
           autoComplete="off"
           layout="vertical"
+          disabled={!registrationEnabled}
         >
           <Form.Item
             name="username"

@@ -1,13 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../stores/AuthContext';
 import { Form, Input, Button, Card, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { systemApi } from '../api';
 
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await systemApi.getSettings();
+        setRegistrationEnabled(response.data.registration_enabled);
+      } catch (error) {
+        console.error('获取设置失败:', error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true);
@@ -62,9 +76,11 @@ const Login: React.FC = () => {
           </Form.Item>
         </Form>
 
-        <div style={{ textAlign: 'center' }}>
-          没有账号？<Link to="/register">立即注册</Link>
-        </div>
+        {registrationEnabled && (
+          <div style={{ textAlign: 'center' }}>
+            没有账号？<Link to="/register">立即注册</Link>
+          </div>
+        )}
       </Card>
     </div>
   );
