@@ -34,7 +34,12 @@ func (s *LikeService) ToggleLike(bibiID, userID uint) (bool, error) {
 	err := db.Where("bibi_id = ? AND user_id = ?", bibiID, userID).First(&existingLike).Error
 
 	if err == nil {
-		// 已经点赞，取消点赞
+		// 已经点赞
+		if userID == 0 {
+			// 匿名用户不允许取消点赞
+			return true, nil
+		}
+		// 登录用户可以取消点赞
 		if err := db.Delete(&existingLike).Error; err != nil {
 			return false, err
 		}
