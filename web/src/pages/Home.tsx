@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Card, Avatar, Button, Space, Tag, Dropdown, message, Pagination, Spin, List, Tabs, Form, Input, Divider, Switch, Modal, Menu } from 'antd';
+import { Layout, Card, Avatar, Button, Space, Tag, Dropdown, message, Pagination, Spin, List, Tabs, Form, Input, Divider, Switch, Modal, Menu, Segmented } from 'antd';
 import { PlusOutlined, MessageOutlined, MoreOutlined, DeleteOutlined, PushpinOutlined, LockOutlined, HomeOutlined, UserOutlined, UserOutlined as ProfileIcon, MailOutlined, LockOutlined as PasswordIcon, SmileOutlined, LikeOutlined, LikeFilled, SettingOutlined, MoonOutlined, SunOutlined, ApiOutlined, DeleteOutlined as ClearOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -45,7 +45,7 @@ interface UserInfo {
 
 const Home: React.FC = () => {
   const { user, logout } = useAuth();
-  const { darkMode, toggleDarkMode } = useTheme();
+  const { darkMode, themeMode, setThemeMode } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [bibis, setBibis] = useState<Bibi[]>([]);
@@ -184,10 +184,6 @@ const Home: React.FC = () => {
         handleLogout();
       },
     });
-  };
-
-  const handleThemeChange = (checked: boolean) => {
-    toggleDarkMode();
   };
 
   const formatDate = (dateString: string) => {
@@ -432,13 +428,16 @@ const Home: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <div className="font-medium dark:text-white">主题模式</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">切换白天/黑夜模式</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">跟随系统/白天/黑夜模式</div>
           </div>
-          <Switch
-            checked={darkMode}
-            onChange={handleThemeChange}
-            checkedChildren={<MoonOutlined />}
-            unCheckedChildren={<SunOutlined />}
+          <Segmented
+            value={themeMode}
+            onChange={(value) => setThemeMode(value as any)}
+            options={[
+              { label: <SunOutlined />, value: 'light' },
+              { label: <MoonOutlined />, value: 'dark' },
+              { label: '跟随系统', value: 'system' },
+            ]}
           />
         </div>
 
@@ -488,20 +487,18 @@ const Home: React.FC = () => {
       label: '首页',
       onClick: () => setActiveTab('home'),
     },
-    ...(user ? [
-    {
-      key: 'profile',
-      icon: <ProfileIcon />,
-      label: '个人中心',
-      onClick: () => setActiveTab('profile'),
-    },
     {
       key: 'settings',
       icon: <SettingOutlined />,
       label: '系统设置',
       onClick: () => setActiveTab('settings'),
     },
-    ] : []),
+    ...(user ? [{
+      key: 'profile',
+      icon: <ProfileIcon />,
+      label: '个人中心',
+      onClick: () => setActiveTab('profile'),
+    }] : []),
   ];
 
   return (
@@ -575,15 +572,13 @@ const Home: React.FC = () => {
               {activeTab === 'home' && renderNotesList()}
             </TabPane>
             {user && (
-              <>
-                <TabPane tab="个人中心" key="profile">
-                  {activeTab === 'profile' && renderProfile()}
-                </TabPane>
-                <TabPane tab="系统设置" key="settings">
-                  {activeTab === 'settings' && renderSettings()}
-                </TabPane>
-              </>
+              <TabPane tab="个人中心" key="profile">
+                {activeTab === 'profile' && renderProfile()}
+              </TabPane>
             )}
+            <TabPane tab="系统设置" key="settings">
+              {activeTab === 'settings' && renderSettings()}
+            </TabPane>
           </Tabs>
         </Content>
       </Layout>
