@@ -454,17 +454,21 @@ const Home: React.FC = () => {
           <Input value={API_ADDRESS} disabled addonBefore={<ApiOutlined />} />
         </div>
 
-        <Divider />
+        {user && (
+          <>
+            <Divider />
 
-        <div>
-          <div className="font-medium mb-2 dark:text-white">清空数据</div>
-          <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">清空所有本地缓存数据，包括登录信息和评论记录</div>
-          <Button danger icon={<ClearOutlined />} onClick={handleClearData}>
-            清空所有数据
-          </Button>
-        </div>
+            <div>
+              <div className="font-medium mb-2 dark:text-white">清空数据</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">清空所有本地缓存数据，包括登录信息和评论记录</div>
+              <Button danger icon={<ClearOutlined />} onClick={handleClearData}>
+                清空所有数据
+              </Button>
+            </div>
 
-        <Divider />
+            <Divider />
+          </>
+        )}
 
         <div>
           <div className="font-medium mb-2 dark:text-white">关于</div>
@@ -484,6 +488,7 @@ const Home: React.FC = () => {
       label: '首页',
       onClick: () => setActiveTab('home'),
     },
+    ...(user ? [
     {
       key: 'profile',
       icon: <ProfileIcon />,
@@ -496,6 +501,7 @@ const Home: React.FC = () => {
       label: '系统设置',
       onClick: () => setActiveTab('settings'),
     },
+    ] : []),
   ];
 
   return (
@@ -568,12 +574,16 @@ const Home: React.FC = () => {
             <TabPane tab="笔记列表" key="home">
               {activeTab === 'home' && renderNotesList()}
             </TabPane>
-            <TabPane tab="个人中心" key="profile">
-              {activeTab === 'profile' && renderProfile()}
-            </TabPane>
-            <TabPane tab="系统设置" key="settings">
-              {activeTab === 'settings' && renderSettings()}
-            </TabPane>
+            {user && (
+              <>
+                <TabPane tab="个人中心" key="profile">
+                  {activeTab === 'profile' && renderProfile()}
+                </TabPane>
+                <TabPane tab="系统设置" key="settings">
+                  {activeTab === 'settings' && renderSettings()}
+                </TabPane>
+              </>
+            )}
           </Tabs>
         </Content>
       </Layout>
