@@ -76,6 +76,9 @@ func RegisterRoutes(r *gin.Engine) {
 			settings.GET("", handleGetSettings)
 			settings.PUT("", handleUpdateSettings)
 		}
+
+		// 公开系统设置（任何人可查看注册状态）
+		api.GET("/public/settings", handleGetPublicSettings)
 	}
 }
 
@@ -599,4 +602,12 @@ func handleUpdateSettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
+}
+
+// handleGetPublicSettings 获取公开系统设置（无需登录）
+func handleGetPublicSettings(c *gin.Context) {
+	registrationEnabled, _ := systemService.GetSetting("registration_enabled")
+	c.JSON(http.StatusOK, gin.H{
+		"registration_enabled": registrationEnabled == "true",
+	})
 }

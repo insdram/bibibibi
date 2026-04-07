@@ -80,6 +80,9 @@ export const systemApi = {
   getSettings: () =>
     client.get('/settings'),
   
+  getPublicSettings: () =>
+    client.get('/public/settings'),
+  
   updateSettings: (data: { registration_enabled?: boolean }) =>
     client.put('/settings', data),
 };

@@ -14,7 +14,7 @@ const Login: React.FC = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await systemApi.getSettings();
+        const response = await systemApi.getPublicSettings();
         setRegistrationEnabled(response.data.registration_enabled);
       } catch (error) {
         console.error('获取设置失败:', error);
