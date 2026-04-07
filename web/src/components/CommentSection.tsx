@@ -159,7 +159,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
   const renderCommentItem = (comment: Comment) => (
     <List.Item
       key={comment.id}
-      className="border-b border-gray-100 dark:border-gray-700 py-3"
+      className="border-b border-gray-100 dark:border-[#303030] py-3"
       actions={[
         <Button
           key="reply"
