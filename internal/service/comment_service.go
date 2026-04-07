@@ -1,9 +1,7 @@
 package service
 
 import (
-	"crypto/md5"
 	"fmt"
-	"strings"
 
 	"github.com/bibibibi/bibibibi/internal/model"
 	"github.com/bibibibi/bibibibi/internal/store"
@@ -28,7 +26,7 @@ func (s *CommentService) CreateComment(bibiID uint, name, email, website, conten
 	}
 
 	// 计算 Gravatar 头像
-	avatar := model.GetGravatarURL(email)
+	avatar := getGravatarURL(email)
 
 	comment := model.Comment{
 		BibiID:   bibiID,
@@ -70,7 +68,7 @@ func (s *CommentService) GetCommentsByBibiID(bibiID uint, page, pageSize int) ([
 
 	// 手动设置 Gravatar 头像
 	for i := range comments {
-		comments[i].Avatar = model.GetGravatarURL(comments[i].Email)
+		comments[i].Avatar = getGravatarURL(comments[i].Email)
 	}
 
 	return comments, total, nil
@@ -90,7 +88,7 @@ func (s *CommentService) UpdateComment(id uint, name, email, website, content st
 	comment.Email = email
 	comment.Website = website
 	comment.Content = content
-	comment.Avatar = model.GetGravatarURL(email)
+	comment.Avatar = getGravatarURL(email)
 
 	if err := db.Save(&comment).Error; err != nil {
 		return nil, err
@@ -107,7 +105,8 @@ func (s *CommentService) DeleteComment(id uint) error {
 
 // getGravatarURL 根据邮箱生成 Gravatar URL
 func getGravatarURL(email string) string {
-	email = strings.TrimSpace(strings.ToLower(email))
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(email)))
-	return fmt.Sprintf("https://www.gravatar.com/avatar/%s?s=80&d=identicon", hash)
+	if email == "" {
+		return ""
+	}
+	return model.GetGravatarURLWithSource(email, GetGravatarSource())
 }

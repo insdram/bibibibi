@@ -6,6 +6,11 @@ import (
 	"gorm.io/gorm"
 )
 
+// getAvatarURL 获取头像 URL（使用系统设置的 Gravatar 源）
+func getAvatarURL(email string) string {
+	return getGravatarURL(email)
+}
+
 // BibiService 笔记服务
 type BibiService struct{}
 
@@ -58,7 +63,7 @@ func (s *BibiService) CreateBibi(creatorID uint, content, visibility string, tag
 
 	// 为评论设置 Gravatar 头像
 	for j := range bibi.Comments {
-		bibi.Comments[j].Avatar = model.GetGravatarURL(bibi.Comments[j].Email)
+		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
 	}
 
 	return &bibi, nil
@@ -73,7 +78,7 @@ func (s *BibiService) GetBibiByID(id uint) (*model.Bibi, error) {
 	}
 	// 为评论设置 Gravatar 头像
 	for j := range bibi.Comments {
-		bibi.Comments[j].Avatar = model.GetGravatarURL(bibi.Comments[j].Email)
+		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
 	}
 	return &bibi, nil
 }
@@ -108,7 +113,7 @@ func (s *BibiService) GetBibis(page, pageSize int, visibility string) ([]model.B
 	// 为评论设置 Gravatar 头像
 	for i := range bibis {
 		for j := range bibis[i].Comments {
-			bibis[i].Comments[j].Avatar = model.GetGravatarURL(bibis[i].Comments[j].Email)
+			bibis[i].Comments[j].Avatar = getAvatarURL(bibis[i].Comments[j].Email)
 		}
 	}
 
@@ -167,7 +172,7 @@ func (s *BibiService) UpdateBibi(id uint, content, visibility string, tagIDs []u
 
 	// 为评论设置 Gravatar 头像
 	for j := range bibi.Comments {
-		bibi.Comments[j].Avatar = model.GetGravatarURL(bibi.Comments[j].Email)
+		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
 	}
 
 	return &bibi, nil
@@ -218,7 +223,7 @@ func (s *BibiService) TogglePin(id uint) (*model.Bibi, error) {
 
 	// 为评论设置 Gravatar 头像
 	for j := range bibi.Comments {
-		bibi.Comments[j].Avatar = model.GetGravatarURL(bibi.Comments[j].Email)
+		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
 	}
 
 	return &bibi, nil
@@ -249,7 +254,7 @@ func (s *BibiService) SearchBibis(keyword string, page, pageSize int) ([]model.B
 	// 为评论设置 Gravatar 头像
 	for i := range bibis {
 		for j := range bibis[i].Comments {
-			bibis[i].Comments[j].Avatar = model.GetGravatarURL(bibis[i].Comments[j].Email)
+			bibis[i].Comments[j].Avatar = getAvatarURL(bibis[i].Comments[j].Email)
 		}
 	}
 

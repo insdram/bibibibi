@@ -116,6 +116,10 @@ func (s *UserService) GetUserByID(id uint) (*model.User, error) {
 	if err := db.First(&user, id).Error; err != nil {
 		return nil, err
 	}
+	// 使用系统设置的 Gravatar 源重新生成头像
+	if user.Email != "" {
+		user.Avatar = generateAvatar(user.Email)
+	}
 	return &user, nil
 }
 
