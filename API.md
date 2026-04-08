@@ -105,6 +105,7 @@
 - `page` (int, 默认 1)
 - `page_size` (int, 默认 20)
 - `visibility` (string, 可选: PUBLIC/PRIVATE)
+- `creator_id` (int, 可选, 按创建者筛选笔记)
 
 **响应**
 ```json
@@ -308,7 +309,8 @@
 **响应**
 ```json
 {
-  "registration_enabled": true
+  "registration_enabled": true,
+  "gravatar_source": "https://weavatar.com/avatar/"
 }
 ```
 
@@ -321,7 +323,71 @@
 **请求**
 ```json
 {
-  "registration_enabled": true/false
+  "registration_enabled": true/false,
+  "gravatar_source": "https://weavatar.com/avatar/"
+}
+```
+
+---
+
+## Token 管理 `/api/v1/tokens`
+
+### GET /tokens - 获取 Token 列表
+
+**需要认证**: 是
+
+**响应**
+```json
+{
+  "tokens": [
+    {
+      "id": 1,
+      "token": "random_token_string",
+      "description": "Token 描述",
+      "expires_at": "2024-01-01T00:00:00Z 或 null（不过期）",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### POST /tokens - 创建 Token
+
+**需要认证**: 是
+
+**请求**
+```json
+{
+  "description": "Token 描述",
+  "expires_in_hours": 24 // 可选，不填或0表示不过期
+}
+```
+
+**响应**
+```json
+{
+  "token": {
+    "id": 1,
+    "token": "random_token_string",
+    "description": "Token 描述",
+    "expires_at": null,
+    "created_at": "2024-01-01T00:00:00Z"
+  }
+}
+```
+
+---
+
+### DELETE /tokens/:id - 删除 Token
+
+**需要认证**: 是
+
+**响应**
+```json
+{
+  "message": "删除成功"
 }
 ```
 
