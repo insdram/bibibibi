@@ -57,6 +57,7 @@ const Home: React.FC = () => {
   const [showEditor, setShowEditor] = useState(false);
   const [expandedComments, setExpandedComments] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('home');
+  const [homeSubTab, setHomeSubTab] = useState<'square' | 'mine'>('square');
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
@@ -73,7 +74,11 @@ const Home: React.FC = () => {
   const fetchBibis = async () => {
     try {
       setLoading(true);
-      const response = await bibiApi.getBibis({ page, page_size: 20 });
+      const params: any = { page, page_size: 20 };
+      if (homeSubTab === 'mine' && user) {
+        params.creator_id = user.id;
+      }
+      const response = await bibiApi.getBibis(params);
       const bibisWithLiked = (response.data.bibis || []).map((bibi: Bibi) => ({
         ...bibi,
         liked: bibi.liked || false,
@@ -88,8 +93,23 @@ const Home: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchBibis();
-  }, [page]);
+    if (activeTab === 'home') {
+      if (!user && homeSubTab === 'mine') {
+        setHomeSubTab('square');
+      } else if (user && homeSubTab === 'square') {
+        setHomeSubTab('mine');
+      }
+      fetchBibis();
+    }
+  }, [page, homeSubTab, user, activeTab]);
+
+  useEffect(() => {
+    if (user) {
+      setHomeSubTab('mine');
+    } else {
+      setHomeSubTab('square');
+    }
+  }, [user]);
 
   const fetchUserInfo = async () => {
     try {
@@ -848,19 +868,24 @@ const Home: React.FC = () => {
 
       <Layout style={{ marginLeft: 240 }}>
         <Content style={{ padding: '24px 24px 0', minHeight: '100vh' }}>
-          <Tabs activeKey={activeTab} onChange={setActiveTab}>
-            <TabPane tab="笔记列表" key="home">
-              {activeTab === 'home' && renderNotesList()}
-            </TabPane>
-            {user && (
-              <TabPane tab="个人中心" key="profile">
-                {activeTab === 'profile' && renderProfile()}
-              </TabPane>
-            )}
-            <TabPane tab="系统设置" key="settings">
-              {activeTab === 'settings' && renderSettings()}
-            </TabPane>
-          </Tabs>
+          {activeTab === 'home' && (
+            <div>
+              <div className="mb-4">
+                <Segmented
+                  value={homeSubTab}
+                  onChange={(value) => setHomeSubTab(value as any)}
+                  options={user ? [
+                    { label: '我的', value: 'mine' },
+                    { label: '广场', value: 'square' },
+                  ] : [{ label: '广场', value: 'square' }]}
+                  block
+                />
+              </div>
+              {renderNotesList()}
+            </div>
+          )}
+          {activeTab === 'profile' && renderProfile()}
+          {activeTab === 'settings' && renderSettings()}
         </Content>
       </Layout>
 
