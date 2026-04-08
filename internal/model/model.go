@@ -106,3 +106,13 @@ type SystemSetting struct {
 	SettingKey  string `json:"setting_key" gorm:"uniqueIndex;size:64;not null"`
 	SettingValue string `json:"setting_value" gorm:"size:255"`
 }
+
+// Token API Token 模型
+type Token struct {
+	ID          uint      `json:"id" gorm:"primaryKey"`
+	UserID      uint      `json:"user_id" gorm:"index;not null"`
+	Token       string    `json:"token" gorm:"size:512;not null"`
+	Description string    `json:"description" gorm:"size:255"`
+	ExpiresAt   *time.Time `json:"expires_at"` // nil 表示永不过期
+	CreatedAt  time.Time `json:"created_at"`
+}

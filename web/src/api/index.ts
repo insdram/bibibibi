@@ -73,9 +73,18 @@ export const userApi = {
   
   updateCurrentUser: (data: { username?: string; nickname?: string; email?: string; website?: string; password?: string }) =>
     client.put('/user/me', data),
+};
+
+// Token 管理相关
+export const tokenApi = {
+  getTokens: () =>
+    client.get('/tokens'),
   
-  refreshToken: () =>
-    client.post('/user/refresh-token'),
+  createToken: (data: { description?: string; expires_in_hours?: number }) =>
+    client.post('/tokens', data),
+  
+  deleteToken: (id: number) =>
+    client.delete(`/tokens/${id}`),
 };
 
 // 系统设置相关

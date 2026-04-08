@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Card, Avatar, Button, Space, Tag, Dropdown, message, Pagination, Spin, List, Tabs, Form, Input, Divider, Switch, Modal, Menu, Segmented } from 'antd';
+import { Layout, Card, Avatar, Button, Space, Tag, Dropdown, message, Pagination, Spin, List, Tabs, Form, Input, Divider, Switch, Modal, Menu, Segmented, Select, Table } from 'antd';
 import { PlusOutlined, MessageOutlined, MoreOutlined, DeleteOutlined, PushpinOutlined, LockOutlined, HomeOutlined, UserOutlined, UserOutlined as ProfileIcon, MailOutlined, LockOutlined as PasswordIcon, SmileOutlined, LikeOutlined, LikeFilled, SettingOutlined, MoonOutlined, SunOutlined, ApiOutlined, DeleteOutlined as ClearOutlined, GlobalOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { bibiApi, userApi, systemApi } from '../api';
+import { bibiApi, userApi, systemApi, tokenApi } from '../api';
 import { useAuth } from '../stores/AuthContext';
 import { useTheme } from '../stores/ThemeContext';
 import CommentSection from '../components/CommentSection';
@@ -46,7 +46,7 @@ interface UserInfo {
 }
 
 const Home: React.FC = () => {
-  const { user, logout, setToken } = useAuth();
+  const { user, logout } = useAuth();
   const { darkMode, themeMode, setThemeMode } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -63,8 +63,11 @@ const Home: React.FC = () => {
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [gravatarSource, setGravatarSource] = useState('https://weavatar.com/avatar/');
   const [settingsLoading, setSettingsLoading] = useState(false);
-  const [refreshTokenLoading, setRefreshTokenLoading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [tokens, setTokens] = useState<any[]>([]);
+  const [tokensLoading, setTokensLoading] = useState(false);
+  const [createTokenModalVisible, setCreateTokenModalVisible] = useState(false);
+  const [createTokenLoading, setCreateTokenLoading] = useState(false);
   const [form] = Form.useForm();
 
   const fetchBibis = async () => {
@@ -112,6 +115,7 @@ const Home: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'settings' && user?.is_admin) {
       fetchSettings();
+      fetchTokens();
     }
   }, [activeTab, user?.is_admin]);
 
@@ -163,17 +167,45 @@ const Home: React.FC = () => {
     }
   };
 
-  const handleRefreshToken = async () => {
-    setRefreshTokenLoading(true);
+  const fetchTokens = async () => {
+    if (!user) return;
+    setTokensLoading(true);
     try {
-      const response = await userApi.refreshToken();
-      const newToken = response.data.token;
-      setToken(newToken);
-      message.success('Token 已刷新');
-    } catch (error: any) {
-      message.error(error.response?.data?.error || '刷新失败');
+      const response = await tokenApi.getTokens();
+      setTokens(response.data.tokens || []);
+    } catch (error) {
+      console.error('获取 Token 列表失败:', error);
     } finally {
-      setRefreshTokenLoading(false);
+      setTokensLoading(false);
+    }
+  };
+
+  const handleCreateToken = async (values: { description: string; expires_in_hours: number }) => {
+    setCreateTokenLoading(true);
+    try {
+      const data = {
+        description: values.description,
+        expires_in_hours: values.expires_in_hours || undefined,
+      };
+      await tokenApi.createToken(data);
+      message.success('Token 创建成功');
+      setCreateTokenModalVisible(false);
+      form.resetFields();
+      fetchTokens();
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '创建失败');
+    } finally {
+      setCreateTokenLoading(false);
+    }
+  };
+
+  const handleDeleteToken = async (id: number) => {
+    try {
+      await tokenApi.deleteToken(id);
+      message.success('Token 已删除');
+      fetchTokens();
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '删除失败');
     }
   };
 
@@ -546,26 +578,98 @@ const Home: React.FC = () => {
 
           {user && (
             <div className="mt-4">
-              <div className="flex items-center justify-between mb-1">
-                <div className="font-medium dark:text-white">认证 Token</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="font-medium dark:text-white">API Token</div>
                 <Button
-                  type="link"
+                  type="primary"
                   size="small"
-                  loading={refreshTokenLoading}
-                  onClick={handleRefreshToken}
+                  icon={<PlusOutlined />}
+                  onClick={() => setCreateTokenModalVisible(true)}
                 >
-                  刷新
+                  创建
                 </Button>
               </div>
-              <Input.TextArea
-                value={localStorage.getItem('token') || ''}
-                disabled
-                rows={1}
-                style={{ resize: 'none' }}
-              />
+              <Spin spinning={tokensLoading}>
+                {tokens.length === 0 ? (
+                  <div className="text-gray-400 dark:text-gray-500 text-sm py-4 text-center">暂无 Token</div>
+                ) : (
+                  <div className="space-y-2">
+                    {tokens.map((token) => (
+                      <div key={token.id} className="border border-gray-200 dark:border-gray-700 rounded p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-sm dark:text-white">{token.description || '无描述'}</span>
+                          <Button
+                            type="text"
+                            danger
+                            size="small"
+                            icon={<DeleteOutlined />}
+                            onClick={() => handleDeleteToken(token.id)}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 font-mono break-all">{token.token}</div>
+                        <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                          创建于: {new Date(token.created_at).toLocaleString('zh-CN')}
+                          {token.expires_at ? (
+                            <> | 过期于: {new Date(token.expires_at).toLocaleString('zh-CN')}</>
+                          ) : (
+                            <> | 不过期</>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Spin>
             </div>
           )}
         </div>
+
+        <Modal
+          title="创建 API Token"
+          open={createTokenModalVisible}
+          onCancel={() => {
+            setCreateTokenModalVisible(false);
+            form.resetFields();
+          }}
+          footer={null}
+        >
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleCreateToken}
+          >
+            <Form.Item
+              name="description"
+              label="描述"
+              rules={[{ required: true, message: '请输入描述' }]}
+            >
+              <Input placeholder="Token 用途描述" />
+            </Form.Item>
+            <Form.Item
+              name="expires_in_hours"
+              label="过期时间"
+              initialValue={0}
+            >
+              <Select>
+                <Select.Option value={0}>不过期</Select.Option>
+                <Select.Option value={24}>24 小时</Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item className="mb-0">
+              <Space>
+                <Button type="primary" htmlType="submit" loading={createTokenLoading}>
+                  创建
+                </Button>
+                <Button onClick={() => {
+                  setCreateTokenModalVisible(false);
+                  form.resetFields();
+                }}>
+                  取消
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
 
         {user?.is_admin && (
           <>

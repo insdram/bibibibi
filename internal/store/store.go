@@ -29,6 +29,7 @@ func InitDB(dbPath string) error {
 		&model.Comment{},
 		&model.Like{},
 		&model.SystemSetting{},
+		&model.Token{},
 	)
 	if err != nil {
 		return err

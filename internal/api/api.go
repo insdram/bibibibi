@@ -16,6 +16,7 @@ var (
 	commentService = service.NewCommentService()
 	likeService    = service.NewLikeService()
 	systemService  = service.NewSystemService()
+	tokenService   = service.NewTokenService()
 )
 
 // RegisterRoutes 注册 API 路由
@@ -34,7 +35,15 @@ func RegisterRoutes(r *gin.Engine) {
 		{
 			user.GET("/me", authMiddleware(), handleGetCurrentUser)
 			user.PUT("/me", authMiddleware(), handleUpdateCurrentUser)
-			user.POST("/refresh-token", authMiddleware(), handleRefreshToken)
+		}
+
+		// Token 管理
+		tokens := api.Group("/tokens")
+		tokens.Use(authMiddleware())
+		{
+			tokens.GET("", handleGetTokens)
+			tokens.POST("", handleCreateToken)
+			tokens.DELETE("/:id", handleDeleteToken)
 		}
 
 		// Bibi 相关
@@ -83,7 +92,7 @@ func RegisterRoutes(r *gin.Engine) {
 	}
 }
 
-// authMiddleware JWT 认证中间件
+// authMiddleware 认证中间件（支持 JWT 和新 Token 格式）
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.GetHeader("Authorization")
@@ -98,11 +107,16 @@ func authMiddleware() gin.HandlerFunc {
 			token = token[7:]
 		}
 
-		userID, err := userService.ParseToken(token)
+		// 先尝试新的 Token 验证
+		userID, err := tokenService.ValidateToken(token)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的认证令牌"})
-			c.Abort()
-			return
+			// 如果失败，尝试旧的 JWT 验证（兼容旧 token）
+			userID, err = service.ParseToken(token)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的认证令牌"})
+				c.Abort()
+				return
+			}
 		}
 
 		c.Set("userID", userID)
@@ -124,11 +138,16 @@ func adminMiddleware() gin.HandlerFunc {
 			token = token[7:]
 		}
 
-		userID, err := userService.ParseToken(token)
+		// 先尝试新的 Token 验证
+		userID, err := tokenService.ValidateToken(token)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的认证令牌"})
-			c.Abort()
-			return
+			// 如果失败，尝试旧的 JWT 验证（兼容旧 token）
+			userID, err = service.ParseToken(token)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的认证令牌"})
+				c.Abort()
+				return
+			}
 		}
 
 		user, err := userService.GetUserByID(userID)
@@ -164,17 +183,63 @@ func handleLogin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": token, "user": user})
 }
 
-// handleRefreshToken 刷新 Token
-func handleRefreshToken(c *gin.Context) {
+// handleGetTokens 获取用户的 Token 列表
+func handleGetTokens(c *gin.Context) {
 	userID := c.GetUint("userID")
 
-	newToken, err := userService.RefreshToken(userID)
+	tokens, err := tokenService.GetTokensByUserID(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "刷新 Token 失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取 Token 列表失败"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": newToken})
+	c.JSON(http.StatusOK, gin.H{"tokens": tokens})
+}
+
+// handleCreateToken 创建新 Token
+func handleCreateToken(c *gin.Context) {
+	userID := c.GetUint("userID")
+
+	var req struct {
+		Description     string `json:"description"`
+		ExpiresInHours   *int   `json:"expires_in_hours"` // nil 或 0 表示不过期
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误"})
+		return
+	}
+
+	var expiresInHours *int
+	if req.ExpiresInHours != nil && *req.ExpiresInHours > 0 {
+		expiresInHours = req.ExpiresInHours
+	}
+
+	token, err := tokenService.CreateToken(userID, req.Description, expiresInHours)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建 Token 失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"token": token})
+}
+
+// handleDeleteToken 删除 Token
+func handleDeleteToken(c *gin.Context) {
+	userID := c.GetUint("userID")
+
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 Token ID"})
+		return
+	}
+
+	if err := tokenService.DeleteToken(uint(id), userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
 }
 
 // handleRegister 处理注册请求
