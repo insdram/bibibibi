@@ -64,6 +64,7 @@ const Home: React.FC = () => {
   const [gravatarSource, setGravatarSource] = useState('https://weavatar.com/avatar/');
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [refreshTokenLoading, setRefreshTokenLoading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [form] = Form.useForm();
 
   const fetchBibis = async () => {
@@ -113,6 +114,18 @@ const Home: React.FC = () => {
       fetchSettings();
     }
   }, [activeTab, user?.is_admin]);
+
+  useEffect(() => {
+    const handleImageClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'IMG') {
+        setPreviewImage((target as HTMLImageElement).src);
+      }
+    };
+
+    document.addEventListener('click', handleImageClick);
+    return () => document.removeEventListener('click', handleImageClick);
+  }, []);
 
   const fetchSettings = async () => {
     try {
@@ -726,6 +739,12 @@ const Home: React.FC = () => {
           </Tabs>
         </Content>
       </Layout>
+
+      {previewImage && (
+        <div className="image-modal-overlay" onClick={() => setPreviewImage(null)}>
+          <img src={previewImage} alt="Preview" />
+        </div>
+      )}
     </Layout>
   );
 };
