@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Card, Avatar, Button, Space, Tag, Dropdown, message, Pagination, Spin, List, Tabs, Form, Input, Divider, Switch, Modal, Menu, Segmented, Select, Table } from 'antd';
+import { Layout, Card, Avatar, Button, Space, Tag, Dropdown, message, Pagination, Spin, List, Tabs, Form, Input, Divider, Switch, Modal, Menu, Segmented, Select, Table, Typography } from 'antd';
 import { PlusOutlined, MessageOutlined, MoreOutlined, DeleteOutlined, PushpinOutlined, LockOutlined, HomeOutlined, UserOutlined, UserOutlined as ProfileIcon, MailOutlined, LockOutlined as PasswordIcon, SmileOutlined, LikeOutlined, LikeFilled, SettingOutlined, MoonOutlined, SunOutlined, ApiOutlined, DeleteOutlined as ClearOutlined, GlobalOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -590,35 +590,55 @@ const Home: React.FC = () => {
                 </Button>
               </div>
               <Spin spinning={tokensLoading}>
-                {tokens.length === 0 ? (
-                  <div className="text-gray-400 dark:text-gray-500 text-sm py-4 text-center">暂无 Token</div>
-                ) : (
-                  <div className="space-y-2">
-                    {tokens.map((token) => (
-                      <div key={token.id} className="border border-gray-200 dark:border-gray-700 rounded p-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium text-sm dark:text-white">{token.description || '无描述'}</span>
-                          <Button
-                            type="text"
-                            danger
-                            size="small"
-                            icon={<DeleteOutlined />}
-                            onClick={() => handleDeleteToken(token.id)}
-                          />
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 font-mono break-all">{token.token}</div>
-                        <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                          创建于: {new Date(token.created_at).toLocaleString('zh-CN')}
-                          {token.expires_at ? (
-                            <> | 过期于: {new Date(token.expires_at).toLocaleString('zh-CN')}</>
-                          ) : (
-                            <> | 不过期</>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <Table
+                  dataSource={tokens}
+                  rowKey="id"
+                  pagination={false}
+                  size="small"
+                  columns={[
+                    {
+                      title: '描述',
+                      dataIndex: 'description',
+                      key: 'description',
+                      render: (text) => text || '无描述',
+                    },
+                    {
+                      title: 'Token',
+                      dataIndex: 'token',
+                      key: 'token',
+                      ellipsis: true,
+                      render: (text) => <Typography.Text type="secondary" className="font-mono text-xs">{text}</Typography.Text>,
+                    },
+                    {
+                      title: '创建时间',
+                      dataIndex: 'created_at',
+                      key: 'created_at',
+                      width: 180,
+                      render: (text) => new Date(text).toLocaleString('zh-CN'),
+                    },
+                    {
+                      title: '过期时间',
+                      dataIndex: 'expires_at',
+                      key: 'expires_at',
+                      width: 180,
+                      render: (text) => text ? new Date(text).toLocaleString('zh-CN') : '不过期',
+                    },
+                    {
+                      title: '操作',
+                      key: 'action',
+                      width: 80,
+                      render: (_, record) => (
+                        <Button
+                          type="text"
+                          danger
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          onClick={() => handleDeleteToken(record.id)}
+                        />
+                      ),
+                    },
+                  ]}
+                />
               </Spin>
             </div>
           )}
