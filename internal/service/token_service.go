@@ -6,14 +6,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
 
 	"github.com/bibibibi/bibibibi/internal/model"
 	"github.com/bibibibi/bibibibi/internal/store"
 )
-
-var jwtSecret = []byte("bibibibi-secret-key")
 
 // TokenService Token 服务
 type TokenService struct{}
@@ -30,15 +27,6 @@ func generateRandomToken() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
-}
-
-// generateJWT 生成 JWT
-func generateJWT(userID uint) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": userID,
-		"exp":     time.Now().Add(24 * time.Hour).Unix(),
-	})
-	return token.SignedString(jwtSecret)
 }
 
 // CreateToken 创建 Token
@@ -111,21 +99,4 @@ func (s *TokenService) ValidateToken(tokenString string) (uint, error) {
 	}
 
 	return token.UserID, nil
-}
-
-// ParseToken 解析 JWT token（兼容旧版）
-func ParseToken(tokenString string) (uint, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
-	})
-	if err != nil {
-		return 0, err
-	}
-
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		userID := uint(claims["user_id"].(float64))
-		return userID, nil
-	}
-
-	return 0, errors.New("无效的 token")
 }
