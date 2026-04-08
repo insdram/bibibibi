@@ -6,11 +6,14 @@ import (
 	"errors"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
 
 	"github.com/bibibibi/bibibibi/internal/model"
 	"github.com/bibibibi/bibibibi/internal/store"
 )
+
+var jwtSecret = []byte("bibibibi-secret-key")
 
 // TokenService Token 服务
 type TokenService struct{}
@@ -99,4 +102,21 @@ func (s *TokenService) ValidateToken(tokenString string) (uint, error) {
 	}
 
 	return token.UserID, nil
+}
+
+// ParseToken 解析 JWT token（兼容旧版）
+func ParseToken(tokenString string) (uint, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		userID := uint(claims["user_id"].(float64))
+		return userID, nil
+	}
+
+	return 0, errors.New("无效的 token")
 }

@@ -12,8 +12,6 @@ import (
 	"github.com/bibibibi/bibibibi/internal/store"
 )
 
-var jwtSecret = []byte("bibibibi-secret-key")
-
 // generateAvatar 生成头像 URL
 func generateAvatar(email string) string {
 	if email == "" {
