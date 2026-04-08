@@ -3,7 +3,7 @@
 ## 基础信息
 
 - **Base URL**: `/api/v1`
-- **认证方式**: JWT Bearer Token
+- **认证方式**: Bearer Token (支持 JWT 和 API Token)
 - **Headers**: `Content-Type: application/json`
 
 ---
@@ -418,13 +418,29 @@
 https://www.gravatar.com/avatar/{md5(email)}?s=80&d=identicon
 ```
 
+### 认证方式
+
+- 支持两种 Token 认证方式：JWT Token 和 API Token
+- API Token 可在系统设置中管理，支持描述和过期时间
+- API Token 不会过期（除非手动删除或设置过期时间）
+
 ### 管理员说明
 
 - 第一个注册的用户自动成为管理员
 - 管理员可以在系统设置中开/关注册功能
+- 管理员可以修改 Gravatar 头像源地址
 
 ### 点赞规则
 
 - 匿名用户可以点赞
 - 点赞后 10 秒内不可重复点赞
 - 点赞不可取消
+
+### 数据库索引
+
+| 表 | 索引类型 | 字段 |
+|---|---|---|
+| User | 唯一索引 | email |
+| Tag | 复合唯一索引 | (creator_id, name) |
+| Like | 复合唯一索引 | (bibi_id, user_id) |
+| Token | 唯一索引 | token |
