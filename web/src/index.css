@@ -68,6 +68,12 @@ body {
   border-radius: 4px;
 }
 
+.markdown-body p:has(img) {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
 .markdown-body table {
   border-collapse: collapse;
   width: 100%;
