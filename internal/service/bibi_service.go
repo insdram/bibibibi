@@ -104,7 +104,7 @@ func (s *BibiService) GetBibiByID(id uint) (*model.Bibi, error) {
 }
 
 // GetBibis 获取笔记列表
-func (s *BibiService) GetBibis(page, pageSize int, visibility string) ([]model.Bibi, int64, error) {
+func (s *BibiService) GetBibis(page, pageSize int, visibility string, creatorID *uint) ([]model.Bibi, int64, error) {
 	db := store.GetDB()
 	var bibis []model.Bibi
 	var total int64
@@ -114,6 +114,11 @@ func (s *BibiService) GetBibis(page, pageSize int, visibility string) ([]model.B
 	// 可见性筛选
 	if visibility != "" {
 		query = query.Where("visibility = ?", visibility)
+	}
+
+	// 创建者筛选
+	if creatorID != nil {
+		query = query.Where("creator_id = ?", *creatorID)
 	}
 
 	// 获取总数

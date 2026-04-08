@@ -306,17 +306,26 @@ func handleGetBibis(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	visibility := c.Query("visibility")
+	creatorIDStr := c.Query("creator_id")
 
-	bibis, total, err := bibiService.GetBibis(page, pageSize, visibility)
+	var creatorID *uint
+	if creatorIDStr != "" {
+		if id, err := strconv.ParseUint(creatorIDStr, 10, 32); err == nil {
+			cid := uint(id)
+			creatorID = &cid
+		}
+	}
+
+	bibis, total, err := bibiService.GetBibis(page, pageSize, visibility, creatorID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取笔记列表失败"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"bibis": bibis,
-		"total": total,
-		"page":  page,
+		"bibis":     bibis,
+		"total":     total,
+		"page":      page,
 		"page_size": pageSize,
 	})
 }

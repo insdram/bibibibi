@@ -11,7 +11,7 @@ export const authApi = {
 
 // Bibi 相关
 export const bibiApi = {
-  getBibis: (params?: { page?: number; page_size?: number; visibility?: string }) =>
+  getBibis: (params?: { page?: number; page_size?: number; visibility?: string; creator_id?: number }) =>
     client.get('/bibis', { params }),
   
   getBibi: (id: number) =>
