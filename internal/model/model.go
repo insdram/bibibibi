@@ -12,7 +12,7 @@ type User struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	Username  string    `json:"username" gorm:"uniqueIndex;size:64;not null"`
 	Password  string    `json:"-" gorm:"size:255;not null"`
-	Email     string    `json:"email" gorm:"size:255"`
+	Email     string    `json:"email" gorm:"uniqueIndex;size:255"`
 	Nickname  string    `json:"nickname" gorm:"size:64"`
 	Website   string    `json:"website" gorm:"size:255"`
 	Avatar    string    `json:"avatar" gorm:"size:255"`
@@ -49,7 +49,7 @@ type Bibi struct {
 type Tag struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	Name      string    `json:"name" gorm:"size:64;not null"`
-	CreatorID uint      `json:"creator_id" gorm:"index;not null"`
+	CreatorID uint      `json:"creator_id" gorm:"uniqueIndex:idx_creator_name;not null"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -95,8 +95,8 @@ func GetGravatarURLWithSource(email, source string) string {
 // Like 点赞模型
 type Like struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
-	BibiID    uint      `json:"bibi_id" gorm:"index;not null"`
-	UserID    uint      `json:"user_id" gorm:"index;not null"`
+	BibiID    uint      `json:"bibi_id" gorm:"uniqueIndex:idx_bibi_user;not null"`
+	UserID    uint      `json:"user_id" gorm:"uniqueIndex:idx_bibi_user;not null"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -109,10 +109,10 @@ type SystemSetting struct {
 
 // Token API Token 模型
 type Token struct {
-	ID          uint      `json:"id" gorm:"primaryKey"`
-	UserID      uint      `json:"user_id" gorm:"index;not null"`
-	Token       string    `json:"token" gorm:"size:512;not null"`
-	Description string    `json:"description" gorm:"size:255"`
+	ID          uint       `json:"id" gorm:"primaryKey"`
+	UserID      uint       `json:"user_id" gorm:"index;not null"`
+	Token       string     `json:"token" gorm:"uniqueIndex;size:512;not null"`
+	Description string     `json:"description" gorm:"size:255"`
 	ExpiresAt   *time.Time `json:"expires_at"` // nil 表示永不过期
-	CreatedAt  time.Time `json:"created_at"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
