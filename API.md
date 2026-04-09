@@ -107,16 +107,21 @@
 - `visibility` (string, 可选: PUBLIC/PRIVATE)
 - `creator_id` (int, 可选, 按创建者筛选笔记)
 
+**说明**:
+- 当指定 `creator_id` 时，返回该用户的笔记
+- 当不指定 `creator_id` 时，返回本地公开笔记 + 远程广场笔记（合并）
+
 **响应**
 ```json
 {
   "bibis": [
     {
-      "id": 1,
+      "id": "sha1_hash_string",
       "content": "markdown内容",
       "visibility": "PUBLIC",
       "pinned": false,
       "like_count": 10,
+      "comment_count": 5,
       "liked": false,
       "created_at": "2024-01-01T00:00:00Z",
       "updated_at": "2024-01-01T00:00:00Z",
@@ -127,7 +132,20 @@
         "avatar": "gravatar_url"
       },
       "tags": [{"id": 1, "name": "tag1"}],
-      "comments": []
+      "comments": [
+        {
+          "id": 1,
+          "parent_id": 0,
+          "name": "评论者名称",
+          "email": "评论者邮箱",
+          "website": "评论者网站",
+          "content": "评论内容",
+          "avatar": "gravatar_url",
+          "created_at": "2024-01-01T00:00:00Z"
+        }
+      ],
+      "is_remote": false,
+      "source_url": "https://remote.example.com"
     }
   ],
   "total": 100,
@@ -135,6 +153,21 @@
   "page_size": 20
 }
 ```
+
+---
+
+### GET /bibis/all - 获取所有公开笔记
+
+**需要认证**: 否
+
+**说明**: 未登录用户查看"我的笔记"时调用此接口，返回所有公开笔记
+
+**Query 参数**
+
+- `page` (int, 默认 1)
+- `page_size` (int, 默认 20)
+
+**响应**: 同 GET /bibis
 
 ---
 
@@ -393,6 +426,58 @@
 
 ---
 
+## 广场数据源 `/api/v1/feeds`
+
+### GET /feeds - 获取广场数据源列表
+
+**需要认证**: 是
+
+**响应**
+```json
+{
+  "feeds": [
+    {
+      "id": 1,
+      "name": "数据源名称",
+      "url": "https://bibi.example.com",
+      "enabled": true,
+      "last_fetch_at": "2024-01-01T00:00:00Z",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### POST /feeds - 创建广场数据源
+
+**需要认证**: 是 (仅管理员)
+
+**请求**
+```json
+{
+  "name": "数据源名称",
+  "url": "https://bibi.example.com"
+}
+```
+
+---
+
+### DELETE /feeds/:id - 删除广场数据源
+
+**需要认证**: 是 (仅管理员)
+
+---
+
+### POST /feeds/sync - 同步广场数据源
+
+**需要认证**: 是 (仅管理员)
+
+**说明**: 手动触发从所有已启用的数据源获取最新笔记
+
+---
+
 ## 公开系统设置 `/api/v1/public`
 
 ### GET /public/settings - 获取公开设置
@@ -435,6 +520,19 @@ https://www.gravatar.com/avatar/{md5(email)}?s=80&d=identicon
 - 匿名用户可以点赞
 - 点赞后 10 秒内不可重复点赞
 - 点赞不可取消
+
+### 笔记 ID 说明
+
+- 笔记 ID 使用 SHA1 全局唯一算法生成
+- 算法: `username + timestamp + random -> SHA1`
+- 确保不同用户的笔记 ID 不会冲突
+
+### 远程笔记
+
+- 笔记广场可聚合来自其他 bibibibi 实例的公开笔记
+- 远程笔记通过 `is_remote` 字段标识
+- 远程笔记的 `source_url` 字段标识来源实例地址
+- 远程笔记的点赞/评论操作直接调用远程 API
 
 ### 数据库索引
 
