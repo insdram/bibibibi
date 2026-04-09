@@ -74,6 +74,7 @@ func RegisterRoutes(r *gin.Engine) {
 		bibis := api.Group("/bibis")
 		{
 			bibis.GET("", handleGetBibis)
+			bibis.GET("/all", handleGetAllBibis)
 			bibis.POST("", authMiddleware(), handleCreateBibi)
 			bibis.GET("/:id", handleGetBibi)
 			bibis.PUT("/:id", authMiddleware(), handleUpdateBibi)
@@ -346,6 +347,29 @@ func handleUpdateCurrentUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user)
+}
+
+// handleGetAllBibis 处理获取所有公开笔记请求（未登录时显示）
+func handleGetAllBibis(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	bibis, total, err := bibiService.GetAllPublicBibis(page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取笔记列表失败"})
+		return
+	}
+
+	if bibis == nil {
+		bibis = []model.Bibi{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"bibis":     bibis,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
 }
 
 // handleGetBibis 处理获取笔记列表请求

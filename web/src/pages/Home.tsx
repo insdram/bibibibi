@@ -86,17 +86,16 @@ const Home: React.FC = () => {
   const fetchBibis = async () => {
     try {
       setLoading(true);
+      let response;
       if (homeSubTab === 'mine' && !user) {
-        setBibis([]);
-        setTotal(0);
-        setLoading(false);
-        return;
+        response = await bibiApi.getAllBibis({ page, page_size: 20 });
+      } else {
+        const params: any = { page, page_size: 20 };
+        if (homeSubTab === 'mine' && user) {
+          params.creator_id = user.id;
+        }
+        response = await bibiApi.getBibis(params);
       }
-      const params: any = { page, page_size: 20 };
-      if (homeSubTab === 'mine' && user) {
-        params.creator_id = user.id;
-      }
-      const response = await bibiApi.getBibis(params);
       console.log('笔记广场数据:', response.data);
       const bibisWithLiked = (response.data.bibis || []).map((bibi: Bibi) => {
         // 用 uuid 或本地 id 作为 localStorage 的 key

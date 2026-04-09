@@ -14,6 +14,9 @@ export const bibiApi = {
   getBibis: (params?: { page?: number; page_size?: number; visibility?: string; creator_id?: number }) =>
     client.get('/bibis', { params }),
   
+  getAllBibis: (params?: { page?: number; page_size?: number }) =>
+    client.get('/bibis/all', { params }),
+  
   getBibi: (id: string) =>
     client.get(`/bibis/${id}`),
   

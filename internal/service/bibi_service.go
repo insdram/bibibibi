@@ -180,6 +180,36 @@ func (s *BibiService) GetBibis(page, pageSize int, visibility string, creatorID 
 	return bibis, total, nil
 }
 
+// GetAllPublicBibis 获取所有公开笔记（未登录时显示）
+func (s *BibiService) GetAllPublicBibis(page, pageSize int) ([]model.Bibi, int64, error) {
+	db := store.GetDB()
+	var bibis []model.Bibi
+	var total int64
+
+	query := db.Model(&model.Bibi{}).Where("visibility = 'PUBLIC'")
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * pageSize
+	if err := query.Preload("Creator").Preload("Tags").Preload("Comments").
+		Order("pinned DESC, created_at DESC").
+		Offset(offset).Limit(pageSize).
+		Find(&bibis).Error; err != nil {
+		return nil, 0, err
+	}
+
+	regenerateCreatorAvatars(bibis)
+	for i := range bibis {
+		for j := range bibis[i].Comments {
+			bibis[i].Comments[j].Avatar = getAvatarURL(bibis[i].Comments[j].Email)
+		}
+	}
+
+	return bibis, total, nil
+}
+
 // UpdateBibi 更新笔记
 func (s *BibiService) UpdateBibi(id string, content, visibility string, tagIDs []uint, creatorID uint) (*model.Bibi, error) {
 	db := store.GetDB()
