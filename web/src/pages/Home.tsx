@@ -526,7 +526,14 @@ const Home: React.FC = () => {
 
   const renderEmpty = () => (
     <div className="text-center py-16">
-      <div className="text-gray-400 dark:text-gray-500">还没有动态</div>
+      <div className="text-gray-400 dark:text-gray-500">
+        {!user && homeSubTab === 'mine' ? '登录后查看我的笔记' : '还没有动态'}
+      </div>
+      {!user && homeSubTab === 'mine' && (
+        <Button type="primary" className="mt-4" onClick={() => navigate('/login')}>
+          登录
+        </Button>
+      )}
     </div>
   );
 
@@ -1152,7 +1159,7 @@ const Home: React.FC = () => {
                 size="small"
                 className="mb-4"
               >
-                {user && <TabPane tab="我的笔记" key="mine" />}
+                <TabPane tab="我的笔记" key="mine" />
                 <TabPane tab="笔记广场" key="square" />
               </Tabs>
               {renderNotesList()}
