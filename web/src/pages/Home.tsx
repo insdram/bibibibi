@@ -1058,12 +1058,12 @@ const Home: React.FC = () => {
       label: '首页',
       onClick: () => setActiveTab('home'),
     },
-    {
+    ...(user ? [{
       key: 'members',
       icon: <UserOutlined />,
       label: '成员列表',
       onClick: () => setActiveTab('members'),
-    },
+    }] : []),
     {
       key: 'settings',
       icon: <SettingOutlined />,
