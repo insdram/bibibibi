@@ -45,8 +45,7 @@ const Register: React.FC = () => {
     }}>
       <Card style={{ width: 400 }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 'bold', margin: 0 }}>bibibibi</h1>
-          <p style={{ marginTop: 8 }}>注册账号</p>
+          <h1 style={{ fontSize: 24, fontWeight: 'bold', margin: 0 }}>哔哔哔哔</h1>
         </div>
 
         {!registrationEnabled && (
