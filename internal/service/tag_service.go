@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"gorm.io/gorm"
 
 	"github.com/bibibibi/bibibibi/internal/model"
@@ -59,12 +60,16 @@ func (s *TagService) GetTags(creatorID uint) ([]model.Tag, error) {
 }
 
 // UpdateTag 更新标签
-func (s *TagService) UpdateTag(id uint, name string) (*model.Tag, error) {
+func (s *TagService) UpdateTag(id uint, name string, creatorID uint) (*model.Tag, error) {
 	db := store.GetDB()
 
 	var tag model.Tag
 	if err := db.First(&tag, id).Error; err != nil {
 		return nil, err
+	}
+
+	if tag.CreatorID != creatorID {
+		return nil, errors.New("无权操作此标签")
 	}
 
 	tag.Name = name
@@ -76,8 +81,17 @@ func (s *TagService) UpdateTag(id uint, name string) (*model.Tag, error) {
 }
 
 // DeleteTag 删除标签
-func (s *TagService) DeleteTag(id uint) error {
+func (s *TagService) DeleteTag(id uint, creatorID uint) error {
 	db := store.GetDB()
+
+	var tag model.Tag
+	if err := db.First(&tag, id).Error; err != nil {
+		return err
+	}
+
+	if tag.CreatorID != creatorID {
+		return errors.New("无权操作此标签")
+	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
 		// 删除标签关联

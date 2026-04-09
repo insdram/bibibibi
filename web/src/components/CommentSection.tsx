@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Input, Button, Avatar, List, Space, message, Popconfirm } from 'antd';
 import { SendOutlined, CommentOutlined, DeleteOutlined } from '@ant-design/icons';
+import axios from 'axios';
 import { commentApi } from '../api';
 import { useAuth } from '../stores/AuthContext';
 
@@ -26,24 +27,67 @@ interface CommentInfo {
 }
 
 interface CommentSectionProps {
-  bibiId: number;
+  bibiId: string | number;
   comments: Comment[];
-  onUpdate: () => void;
+  onBibiUpdate?: () => void;
   isOwner?: boolean;
+  isRemote?: boolean;
+  remoteSourceUrl?: string;
 }
 
-const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpdate, isOwner }) => {
+const CommentSection: React.FC<CommentSectionProps> = ({
+  bibiId,
+  comments,
+  onBibiUpdate,
+  isOwner,
+  isRemote,
+  remoteSourceUrl,
+}) => {
   const { user } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [website, setWebsite] = useState('');
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
+  const [localComments, setLocalComments] = useState<Comment[]>(comments);
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [replyName, setReplyName] = useState('');
   const [replyEmail, setReplyEmail] = useState('');
   const [replyWebsite, setReplyWebsite] = useState('');
   const [replyContent, setReplyContent] = useState('');
+
+  const fetchRemoteComments = useCallback(async () => {
+    if (!remoteSourceUrl || !isRemote) return;
+    try {
+      const baseUrl = remoteSourceUrl.replace(/\/$/, '');
+      const response = await axios.get(`${baseUrl}/api/v1/bibis/${bibiId}/comments`);
+      const fetchedComments = response.data.comments || [];
+      setLocalComments(fetchedComments);
+    } catch (error) {
+      console.error('获取远程评论失败:', error);
+    }
+  }, [remoteSourceUrl, isRemote, bibiId]);
+
+  const fetchLocalComments = useCallback(async () => {
+    if (isRemote) return;
+    try {
+      const response = await commentApi.getComments(bibiId);
+      const fetchedComments = response.data.comments || [];
+      setLocalComments(fetchedComments);
+    } catch (error) {
+      console.error('获取评论失败:', error);
+    }
+  }, [isRemote, bibiId]);
+
+  useEffect(() => {
+    if (isRemote && remoteSourceUrl) {
+      fetchRemoteComments();
+    }
+  }, [isRemote, remoteSourceUrl, fetchRemoteComments]);
+
+  useEffect(() => {
+    setLocalComments(comments);
+  }, [comments]);
 
   useEffect(() => {
     if (user) {
@@ -77,16 +121,30 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
 
     setLoading(true);
     try {
-      await commentApi.createComment(bibiId, {
-        name: name.trim(),
-        email: email.trim(),
-        website: website.trim() || undefined,
-        content: content.trim(),
-      });
+      if (isRemote && remoteSourceUrl) {
+        const baseUrl = remoteSourceUrl.replace(/\/$/, '');
+        await axios.post(`${baseUrl}/api/v1/bibis/${bibiId}/comments`, {
+          name: name.trim(),
+          email: email.trim(),
+          website: website.trim() || undefined,
+          content: content.trim(),
+        });
+      } else {
+        await commentApi.createComment(bibiId, {
+          name: name.trim(),
+          email: email.trim(),
+          website: website.trim() || undefined,
+          content: content.trim(),
+        });
+      }
       saveCommentInfo({ name: name.trim(), email: email.trim(), website: website.trim() });
       setContent('');
       message.success('评论成功');
-      onUpdate();
+      if (isRemote) {
+        fetchRemoteComments();
+      } else {
+        onBibiUpdate?.();
+      }
     } catch (error) {
       console.error('发表评论失败:', error);
       message.error('评论失败');
@@ -103,13 +161,23 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
 
     setLoading(true);
     try {
-      await commentApi.createComment(bibiId, {
-        name: replyName.trim(),
-        email: replyEmail.trim(),
-        website: replyWebsite.trim() || undefined,
-        content: replyContent.trim(),
-        parent_id: replyTo?.id,
-      });
+      if (isRemote && remoteSourceUrl) {
+        const baseUrl = remoteSourceUrl.replace(/\/$/, '');
+        await axios.post(`${baseUrl}/api/v1/bibis/${bibiId}/comments`, {
+          name: replyName.trim(),
+          email: replyEmail.trim(),
+          website: replyWebsite.trim() || undefined,
+          content: replyContent.trim(),
+        });
+      } else {
+        await commentApi.createComment(bibiId, {
+          name: replyName.trim(),
+          email: replyEmail.trim(),
+          website: replyWebsite.trim() || undefined,
+          content: replyContent.trim(),
+          parent_id: replyTo?.id,
+        });
+      }
       saveCommentInfo({ name: replyName.trim(), email: replyEmail.trim(), website: replyWebsite.trim() });
       setReplyName('');
       setReplyEmail('');
@@ -117,7 +185,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
       setReplyContent('');
       setReplyTo(null);
       message.success('回复成功');
-      onUpdate();
+      if (isRemote) {
+        fetchRemoteComments();
+      } else {
+        onBibiUpdate?.();
+      }
     } catch (error) {
       console.error('回复失败:', error);
       message.error('回复失败');
@@ -138,7 +210,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
     try {
       await commentApi.deleteComment(commentId);
       message.success('删除成功');
-      onUpdate();
+      onBibiUpdate?.();
     } catch (error) {
       console.error('删除评论失败:', error);
       message.error('删除失败');
@@ -204,16 +276,17 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
         </Avatar>
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-medium text-gray-800 dark:text-white">{comment.name}</span>
-            {comment.website && (
+            {comment.website ? (
               <a
                 href={comment.website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-blue-500 dark:text-blue-400 hover:text-blue-600"
+                className="font-medium text-blue-500 dark:text-blue-400 hover:text-blue-600"
               >
-                {comment.website}
+                {comment.name}
               </a>
+            ) : (
+              <span className="font-medium text-gray-800 dark:text-white">{comment.name}</span>
             )}
             <span className="text-xs text-gray-400 dark:text-gray-500">
               {formatDate(comment.created_at)}
@@ -221,7 +294,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
           </div>
           {comment.parent_id > 0 && (
             <div className="text-xs text-blue-500 dark:text-blue-400 mb-1">
-              回复 @{comments.find(c => c.id === comment.parent_id)?.name || '已删除'}
+              回复 @{localComments.find(c => c.id === comment.parent_id)?.name || '已删除'}
             </div>
           )}
           <p className="text-gray-600 dark:text-gray-300 text-sm m-0 whitespace-pre-wrap">{comment.content}</p>
@@ -233,11 +306,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ bibiId, comments, onUpd
   return (
     <div>
       <div className="mb-4">
-        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">评论 ({comments.length})</h4>
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">评论 ({localComments.length})</h4>
         
-        {comments.length > 0 ? (
+        {localComments.length > 0 ? (
           <List
-            dataSource={comments}
+            dataSource={localComments}
             renderItem={renderCommentItem}
             locale={{ emptyText: '暂无评论' }}
           />

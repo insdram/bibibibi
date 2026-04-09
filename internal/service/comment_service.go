@@ -1,10 +1,12 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/bibibibi/bibibibi/internal/model"
 	"github.com/bibibibi/bibibibi/internal/store"
+	"gorm.io/gorm"
 )
 
 // CommentService 评论服务
@@ -16,37 +18,47 @@ func NewCommentService() *CommentService {
 }
 
 // CreateComment 创建评论
-func (s *CommentService) CreateComment(bibiID uint, name, email, website, content string, parentID uint) (*model.Comment, error) {
+func (s *CommentService) CreateComment(bibiID string, name, email, website, content string, parentID uint) (*model.Comment, error) {
 	db := store.GetDB()
 
-	// 检查笔记是否存在
-	var bibi model.Bibi
-	if err := db.First(&bibi, bibiID).Error; err != nil {
-		return nil, fmt.Errorf("笔记不存在")
-	}
+	var comment *model.Comment
+	err := db.Transaction(func(tx *gorm.DB) error {
+		// 检查笔记是否存在
+		var bibi model.Bibi
+		if err := tx.First(&bibi, "id = ?", bibiID).Error; err != nil {
+			return fmt.Errorf("笔记不存在")
+		}
 
-	// 计算 Gravatar 头像
-	avatar := getGravatarURL(email)
+		// 计算 Gravatar 头像
+		avatar := getGravatarURL(email)
 
-	comment := model.Comment{
-		BibiID:   bibiID,
-		ParentID: parentID,
-		Name:     name,
-		Email:    email,
-		Website:  website,
-		Content:  content,
-		Avatar:   avatar,
-	}
+		comment = &model.Comment{
+			BibiID:   bibiID,
+			ParentID: parentID,
+			Name:     name,
+			Email:    email,
+			Website:  website,
+			Content:  content,
+			Avatar:   avatar,
+		}
 
-	if err := db.Create(&comment).Error; err != nil {
-		return nil, err
-	}
+		if err := tx.Create(comment).Error; err != nil {
+			return err
+		}
 
-	return &comment, nil
+		// 增加评论数
+		if err := tx.Exec("UPDATE bibis SET comment_count = comment_count + 1 WHERE id = ?", bibiID).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return comment, err
 }
 
 // GetCommentsByBibiID 获取笔记的评论列表
-func (s *CommentService) GetCommentsByBibiID(bibiID uint, page, pageSize int) ([]model.Comment, int64, error) {
+func (s *CommentService) GetCommentsByBibiID(bibiID string, page, pageSize int) ([]model.Comment, int64, error) {
 	db := store.GetDB()
 	var comments []model.Comment
 	var total int64
@@ -98,9 +110,32 @@ func (s *CommentService) UpdateComment(id uint, name, email, website, content st
 }
 
 // DeleteComment 删除评论
-func (s *CommentService) DeleteComment(id uint) error {
+func (s *CommentService) DeleteComment(id uint, userID uint) error {
 	db := store.GetDB()
-	return db.Delete(&model.Comment{}, id).Error
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		var comment model.Comment
+		if err := tx.First(&comment, id).Error; err != nil {
+			return err
+		}
+
+		var bibi model.Bibi
+		if err := tx.First(&bibi, "id = ?", comment.BibiID).Error; err != nil {
+			return err
+		}
+
+		if bibi.CreatorID != userID {
+			return errors.New("无权删除此评论")
+		}
+
+		// 删除评论
+		if err := tx.Delete(&model.Comment{}, id).Error; err != nil {
+			return err
+		}
+
+		// 减少评论数
+		return tx.Exec("UPDATE bibis SET comment_count = comment_count - 1 WHERE id = ?", comment.BibiID).Error
+	})
 }
 
 // getGravatarURL 根据邮箱生成 Gravatar URL

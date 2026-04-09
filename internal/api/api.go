@@ -1,11 +1,15 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/bibibibi/bibibibi/internal/model"
 	"github.com/bibibibi/bibibibi/internal/service"
 )
 
@@ -17,11 +21,30 @@ var (
 	likeService    = service.NewLikeService()
 	systemService  = service.NewSystemService()
 	tokenService   = service.NewTokenService()
+	feedService    = service.NewFeedService()
 )
+
+// corsMiddleware CORS 中间件
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Authorization, Accept, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	}
+}
 
 // RegisterRoutes 注册 API 路由
 func RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1")
+	api.Use(corsMiddleware())
 	{
 		// 认证相关
 		auth := api.Group("/auth")
@@ -35,6 +58,7 @@ func RegisterRoutes(r *gin.Engine) {
 		{
 			user.GET("/me", authMiddleware(), handleGetCurrentUser)
 			user.PUT("/me", authMiddleware(), handleUpdateCurrentUser)
+			user.GET("/list", handleGetUsers)
 		}
 
 		// Token 管理
@@ -75,8 +99,8 @@ func RegisterRoutes(r *gin.Engine) {
 		// 评论相关
 		comments := api.Group("/comments")
 		{
-			comments.PUT("/:id", handleUpdateComment)
-			comments.DELETE("/:id", handleDeleteComment)
+			comments.PUT("/:id", authMiddleware(), handleUpdateComment)
+			comments.DELETE("/:id", authMiddleware(), handleDeleteComment)
 		}
 
 		// 系统设置（仅管理员）
@@ -89,6 +113,19 @@ func RegisterRoutes(r *gin.Engine) {
 
 		// 公开系统设置（任何人可查看注册状态）
 		api.GET("/public/settings", handleGetPublicSettings)
+
+		// 广场数据源管理（仅管理员）
+		feeds := api.Group("/feeds")
+		feeds.Use(adminMiddleware())
+		{
+			feeds.GET("", handleGetFeedSources)
+			feeds.POST("", handleCreateFeedSource)
+			feeds.DELETE("/:id", handleDeleteFeedSource)
+			feeds.POST("/sync", handleSyncFeedSources)
+		}
+
+		// 公开的远程笔记（用于广场）
+		api.GET("/public/remote-bibis", handleGetRemoteBibis)
 	}
 }
 
@@ -276,6 +313,16 @@ func handleGetCurrentUser(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// handleGetUsers 获取所有用户
+func handleGetUsers(c *gin.Context) {
+	users, err := userService.GetUsers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, users)
+}
+
 // handleUpdateCurrentUser 更新当前用户信息
 func handleUpdateCurrentUser(c *gin.Context) {
 	userID := c.GetUint("userID")
@@ -322,6 +369,81 @@ func handleGetBibis(c *gin.Context) {
 		return
 	}
 
+	// 确保 bibis 不是 nil（JSON 序列化 nil 切片会变成 null）
+	if bibis == nil {
+		bibis = []model.Bibi{}
+	}
+
+	// 如果是获取广场（没有指定 creator_id），合并远程笔记
+	if creatorID == nil {
+		remoteBibis, err := feedService.GetAllRemoteBibis()
+		if err != nil {
+			// 如果获取远程笔记失败，仍然返回本地笔记
+			c.JSON(http.StatusOK, gin.H{
+				"bibis":     bibis,
+				"total":     total,
+				"page":      page,
+				"page_size": pageSize,
+			})
+			return
+		}
+		// 合并总数
+		total += int64(len(remoteBibis))
+		// 将远程笔记转换为统一格式
+		allBibis := make([]map[string]interface{}, 0, len(bibis)+len(remoteBibis))
+		for _, b := range bibis {
+			allBibis = append(allBibis, map[string]interface{}{
+				"id":            b.ID,
+				"content":       b.Content,
+				"visibility":    b.Visibility,
+				"pinned":       b.Pinned,
+				"like_count":    b.LikeCount,
+				"comment_count": b.CommentCount,
+				"liked":        false,
+				"created_at":    b.CreatedAt.Format(time.RFC3339),
+				"creator":        b.Creator,
+				"tags":          b.Tags,
+				"comments":      b.Comments,
+				"is_remote":     false,
+			})
+		}
+		for _, rb := range remoteBibis {
+			allBibis = append(allBibis, map[string]interface{}{
+				"id":            rb.ID,
+				"content":       rb.Content,
+				"visibility":    "PUBLIC",
+				"pinned":       false,
+				"like_count":    rb.LikeCount,
+				"comment_count": rb.CommentCount,
+				"liked":        false,
+				"created_at":    rb.CreatedAt,
+				"creator": map[string]interface{}{
+					"id":       0,
+					"username": rb.Creator.Username,
+					"nickname": rb.Creator.Nickname,
+					"avatar":   rb.Creator.Avatar,
+				},
+				"tags":       []interface{}{},
+				"comments":   rb.Comments,
+				"is_remote":  true,
+				"source_url": rb.SourceURL,
+			})
+		}
+
+		// 按时间倒序排列
+		sort.Slice(allBibis, func(i, j int) bool {
+			return allBibis[i]["created_at"].(string) > allBibis[j]["created_at"].(string)
+		})
+
+		c.JSON(http.StatusOK, gin.H{
+			"bibis":     allBibis,
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"bibis":     bibis,
 		"total":     total,
@@ -359,13 +481,9 @@ func handleCreateBibi(c *gin.Context) {
 
 // handleGetBibi 处理获取笔记详情请求
 func handleGetBibi(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的笔记 ID"})
-		return
-	}
+	id := c.Param("id")
 
-	bibi, err := bibiService.GetBibiByID(uint(id))
+	bibi, err := bibiService.GetBibiByID(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "笔记不存在"})
 		return
@@ -376,11 +494,9 @@ func handleGetBibi(c *gin.Context) {
 
 // handleUpdateBibi 处理更新笔记请求
 func handleUpdateBibi(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的笔记 ID"})
-		return
-	}
+	id := c.Param("id")
+
+	userID := c.GetUint("userID")
 
 	var req struct {
 		Content    string `json:"content" binding:"required"`
@@ -397,9 +513,9 @@ func handleUpdateBibi(c *gin.Context) {
 		req.Visibility = "PUBLIC"
 	}
 
-	bibi, err := bibiService.UpdateBibi(uint(id), req.Content, req.Visibility, req.TagIDs)
+	bibi, err := bibiService.UpdateBibi(id, req.Content, req.Visibility, req.TagIDs, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新笔记失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -408,14 +524,12 @@ func handleUpdateBibi(c *gin.Context) {
 
 // handleDeleteBibi 处理删除笔记请求
 func handleDeleteBibi(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的笔记 ID"})
-		return
-	}
+	id := c.Param("id")
 
-	if err := bibiService.DeleteBibi(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除笔记失败"})
+	userID := c.GetUint("userID")
+
+	if err := bibiService.DeleteBibi(id, userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -424,15 +538,13 @@ func handleDeleteBibi(c *gin.Context) {
 
 // handleTogglePin 处理切换置顶状态请求
 func handleTogglePin(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的笔记 ID"})
-		return
-	}
+	id := c.Param("id")
 
-	bibi, err := bibiService.TogglePin(uint(id))
+	userID := c.GetUint("userID")
+
+	bibi, err := bibiService.TogglePin(id, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "切换置顶状态失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -441,21 +553,14 @@ func handleTogglePin(c *gin.Context) {
 
 // handleToggleLike 处理切换点赞状态请求
 func handleToggleLike(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的笔记 ID"})
-		return
-	}
+	id := c.Param("id")
 
-	userID := c.GetUint("userID")
-
-	liked, err := likeService.ToggleLike(uint(id), userID)
-	if err != nil {
+	if err := likeService.ToggleLike(id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"liked": liked})
+	c.JSON(http.StatusOK, gin.H{"liked": true})
 }
 
 // handleSearchBibis 处理搜索笔记请求
@@ -510,7 +615,7 @@ func handleCreateTag(c *gin.Context) {
 	userID := c.GetUint("userID")
 	tag, err := tagService.CreateTag(req.Name, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建标签失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -525,6 +630,8 @@ func handleUpdateTag(c *gin.Context) {
 		return
 	}
 
+	userID := c.GetUint("userID")
+
 	var req struct {
 		Name string `json:"name" binding:"required"`
 	}
@@ -534,9 +641,9 @@ func handleUpdateTag(c *gin.Context) {
 		return
 	}
 
-	tag, err := tagService.UpdateTag(uint(id), req.Name)
+	tag, err := tagService.UpdateTag(uint(id), req.Name, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新标签失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -551,8 +658,10 @@ func handleDeleteTag(c *gin.Context) {
 		return
 	}
 
-	if err := tagService.DeleteTag(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除标签失败"})
+	userID := c.GetUint("userID")
+
+	if err := tagService.DeleteTag(uint(id), userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -561,16 +670,12 @@ func handleDeleteTag(c *gin.Context) {
 
 // handleGetComments 处理获取评论列表请求
 func handleGetComments(c *gin.Context) {
-	bibiID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的笔记 ID"})
-		return
-	}
+	bibiID := c.Param("id")
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
-	comments, total, err := commentService.GetCommentsByBibiID(uint(bibiID), page, pageSize)
+	comments, total, err := commentService.GetCommentsByBibiID(bibiID, page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取评论列表失败"})
 		return
@@ -586,11 +691,7 @@ func handleGetComments(c *gin.Context) {
 
 // handleCreateComment 处理创建评论请求
 func handleCreateComment(c *gin.Context) {
-	bibiID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的笔记 ID"})
-		return
-	}
+	bibiID := c.Param("id")
 
 	var req struct {
 		Name     string `json:"name" binding:"required"`
@@ -605,7 +706,7 @@ func handleCreateComment(c *gin.Context) {
 		return
 	}
 
-	comment, err := commentService.CreateComment(uint(bibiID), req.Name, req.Email, req.Website, req.Content, req.ParentID)
+	comment, err := commentService.CreateComment(bibiID, req.Name, req.Email, req.Website, req.Content, req.ParentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建评论失败"})
 		return
@@ -651,8 +752,10 @@ func handleDeleteComment(c *gin.Context) {
 		return
 	}
 
-	if err := commentService.DeleteComment(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评论失败"})
+	userID := c.GetUint("userID")
+
+	if err := commentService.DeleteComment(uint(id), userID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -715,5 +818,79 @@ func handleGetPublicSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"registration_enabled": registrationEnabled == "true",
 		"gravatar_source":      gravatarSource,
+	})
+}
+
+// handleGetFeedSources 获取所有广场数据源
+func handleGetFeedSources(c *gin.Context) {
+	sources, err := feedService.GetFeedSources()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取数据源失败"})
+		return
+	}
+	c.JSON(http.StatusOK, sources)
+}
+
+// handleCreateFeedSource 创建广场数据源
+func handleCreateFeedSource(c *gin.Context) {
+	var req struct {
+		Name string `json:"name" binding:"required"`
+		URL  string `json:"url" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误"})
+		return
+	}
+
+	source, err := feedService.CreateFeedSource(req.Name, req.URL)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建数据源失败"})
+		return
+	}
+
+	// 立即获取一次数据（同步执行，返回错误给前端）
+	if _, err := feedService.FetchBibisFromSource(source.URL); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"source": source,
+			"warning": fmt.Sprintf("数据源创建成功但同步失败: %v", err),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, source)
+}
+
+// handleDeleteFeedSource 删除广场数据源
+func handleDeleteFeedSource(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的数据源 ID"})
+		return
+	}
+
+	if err := feedService.DeleteFeedSource(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除数据源失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
+}
+
+// handleSyncFeedSources 同步所有广场数据源（远程笔记不再存储，此接口仅返回成功）
+func handleSyncFeedSources(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "同步成功"})
+}
+
+// handleGetRemoteBibis 获取远程笔记（直接调用远程API）
+func handleGetRemoteBibis(c *gin.Context) {
+	bibis, err := feedService.GetAllRemoteBibis()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取远程笔记失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"bibis": bibis,
+		"total": len(bibis),
 	})
 }

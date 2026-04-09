@@ -14,22 +14,22 @@ export const bibiApi = {
   getBibis: (params?: { page?: number; page_size?: number; visibility?: string; creator_id?: number }) =>
     client.get('/bibis', { params }),
   
-  getBibi: (id: number) =>
+  getBibi: (id: string) =>
     client.get(`/bibis/${id}`),
   
   createBibi: (data: { content: string; visibility?: string; tag_ids?: number[] }) =>
     client.post('/bibis', data),
   
-  updateBibi: (id: number, data: { content: string; visibility?: string; tag_ids?: number[] }) =>
+  updateBibi: (id: string, data: { content: string; visibility?: string; tag_ids?: number[] }) =>
     client.put(`/bibis/${id}`, data),
   
-  deleteBibi: (id: number) =>
+  deleteBibi: (id: string) =>
     client.delete(`/bibis/${id}`),
   
-  togglePin: (id: number) =>
+  togglePin: (id: string) =>
     client.post(`/bibis/${id}/pin`),
   
-  toggleLike: (id: number) =>
+  toggleLike: (id: string) =>
     client.post(`/bibis/${id}/like`),
   
   searchBibis: (keyword: string, params?: { page?: number; page_size?: number }) =>
@@ -53,10 +53,10 @@ export const tagApi = {
 
 // 评论相关
 export const commentApi = {
-  getComments: (bibiId: number, params?: { page?: number; page_size?: number }) =>
+  getComments: (bibiId: string, params?: { page?: number; page_size?: number }) =>
     client.get(`/bibis/${bibiId}/comments`, { params }),
   
-  createComment: (bibiId: number, data: { name: string; email: string; website?: string; content: string; parent_id?: number }) =>
+  createComment: (bibiId: string, data: { name: string; email: string; website?: string; content: string; parent_id?: number }) =>
     client.post(`/bibis/${bibiId}/comments`, data),
   
   updateComment: (id: number, data: { name: string; email: string; website?: string; content: string }) =>
@@ -70,6 +70,9 @@ export const commentApi = {
 export const userApi = {
   getCurrentUser: () =>
     client.get('/user/me'),
+  
+  getUsers: () =>
+    client.get('/user/list'),
   
   updateCurrentUser: (data: { username?: string; nickname?: string; email?: string; website?: string; password?: string }) =>
     client.put('/user/me', data),
@@ -97,4 +100,19 @@ export const systemApi = {
   
   updateSettings: (data: { registration_enabled?: boolean; gravatar_source?: string }) =>
     client.put('/settings', data),
+};
+
+// 广场数据源相关
+export const feedApi = {
+  getFeedSources: () =>
+    client.get('/feeds'),
+  
+  createFeedSource: (data: { name: string; url: string }) =>
+    client.post('/feeds', data),
+  
+  deleteFeedSource: (id: number) =>
+    client.delete(`/feeds/${id}`),
+  
+  syncFeedSources: () =>
+    client.post('/feeds/sync'),
 };

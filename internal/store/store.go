@@ -30,6 +30,7 @@ func InitDB(dbPath string) error {
 		&model.Like{},
 		&model.SystemSetting{},
 		&model.Token{},
+		&model.FeedSource{},
 	)
 	if err != nil {
 		return err

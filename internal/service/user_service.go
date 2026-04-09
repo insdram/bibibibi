@@ -198,3 +198,13 @@ func (s *UserService) UpdateUser(id uint, username, nickname, email, website, pa
 
 	return &user, nil
 }
+
+// GetUsers 获取所有用户
+func (s *UserService) GetUsers() ([]model.User, error) {
+	db := store.GetDB()
+	var users []model.User
+	if err := db.Select("id, username, nickname, email, is_admin, created_at").Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
+}

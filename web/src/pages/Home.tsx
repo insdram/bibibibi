@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Card, Avatar, Button, Space, Tag, Dropdown, message, Pagination, Spin, List, Tabs, Form, Input, Divider, Switch, Modal, Menu, Segmented, Select, Table, Typography } from 'antd';
+import { Layout, Card, Avatar, Button, Space, Tag, Dropdown, message, Pagination, Spin, List, Tabs, Form, Input, Divider, Switch, Modal, Menu, Segmented, Select, Table, Typography, Skeleton } from 'antd';
 import { PlusOutlined, MessageOutlined, MoreOutlined, DeleteOutlined, PushpinOutlined, LockOutlined, HomeOutlined, UserOutlined, UserOutlined as ProfileIcon, MailOutlined, LockOutlined as PasswordIcon, SmileOutlined, LikeOutlined, LikeFilled, SettingOutlined, MoonOutlined, SunOutlined, ApiOutlined, DeleteOutlined as ClearOutlined, GlobalOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
+import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { bibiApi, userApi, systemApi, tokenApi } from '../api';
+import { bibiApi, userApi, systemApi, tokenApi, feedApi } from '../api';
 import { useAuth } from '../stores/AuthContext';
 import { useTheme } from '../stores/ThemeContext';
 import CommentSection from '../components/CommentSection';
@@ -17,14 +18,14 @@ const { TabPane } = Tabs;
 const API_ADDRESS = import.meta.env.VITE_API_URL || '/api/v1';
 
 interface Bibi {
-  id: number;
+  id: string | number;
   content: string;
   visibility: string;
   pinned: boolean;
   like_count: number;
   liked: boolean;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   creator: {
     id: number;
     username: string;
@@ -33,6 +34,9 @@ interface Bibi {
   };
   tags: Array<{ id: number; name: string }>;
   comments: Array<any>;
+  is_remote?: boolean;
+  source_id?: number;
+  source_url?: string;
 }
 
 interface UserInfo {
@@ -55,7 +59,8 @@ const Home: React.FC = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [showEditor, setShowEditor] = useState(false);
-  const [expandedComments, setExpandedComments] = useState<number | null>(null);
+  const [expandedComments, setExpandedComments] = useState<string | number | null>(null);
+  const [likedAnimating, setLikedAnimating] = useState<string | number | null>(null);
   const [activeTab, setActiveTab] = useState('home');
   const [homeSubTab, setHomeSubTab] = useState<'square' | 'mine'>('square');
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
@@ -69,6 +74,13 @@ const Home: React.FC = () => {
   const [tokensLoading, setTokensLoading] = useState(false);
   const [createTokenModalVisible, setCreateTokenModalVisible] = useState(false);
   const [createTokenLoading, setCreateTokenLoading] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [feedSources, setFeedSources] = useState<any[]>([]);
+  const [feedSourcesLoading, setFeedSourcesLoading] = useState(false);
+  const [createFeedSourceModalVisible, setCreateFeedSourceModalVisible] = useState(false);
+  const [createFeedSourceLoading, setCreateFeedSourceLoading] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
   const [form] = Form.useForm();
 
   const fetchBibis = async () => {
@@ -79,10 +91,22 @@ const Home: React.FC = () => {
         params.creator_id = user.id;
       }
       const response = await bibiApi.getBibis(params);
-      const bibisWithLiked = (response.data.bibis || []).map((bibi: Bibi) => ({
-        ...bibi,
-        liked: bibi.liked || false,
-      }));
+      console.log('笔记广场数据:', response.data);
+      const bibisWithLiked = (response.data.bibis || []).map((bibi: Bibi) => {
+        // 用 uuid 或本地 id 作为 localStorage 的 key
+        const storageId = bibi.is_remote ? String(bibi.id) : bibi.id;
+        const likedKey = `bibibibi_liked_${storageId}`;
+        const likeCountKey = `bibibibi_likecount_${storageId}`;
+        const isLiked = localStorage.getItem(likedKey) === 'true';
+        const storedLikeCount = parseInt(localStorage.getItem(likeCountKey) || '0', 10);
+        // 如果是远程笔记且有本地存储的点赞数，使用本地的
+        const likeCount = bibi.is_remote && storedLikeCount > 0 ? storedLikeCount : bibi.like_count;
+        return {
+          ...bibi,
+          liked: bibi.liked || isLiked,
+          like_count: likeCount,
+        };
+      });
       setBibis(bibisWithLiked);
       setTotal(response.data.total || 0);
     } catch (error) {
@@ -94,22 +118,15 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'home') {
-      if (!user && homeSubTab === 'mine') {
-        setHomeSubTab('square');
-      } else if (user && homeSubTab === 'square') {
-        setHomeSubTab('mine');
-      }
       fetchBibis();
     }
   }, [page, homeSubTab, user, activeTab]);
 
   useEffect(() => {
-    if (user) {
-      setHomeSubTab('mine');
-    } else {
-      setHomeSubTab('square');
+    if (activeTab === 'home') {
+      fetchBibis();
     }
-  }, [user]);
+  }, [page, homeSubTab, user, activeTab]);
 
   const fetchUserInfo = async () => {
     try {
@@ -136,8 +153,15 @@ const Home: React.FC = () => {
     if (activeTab === 'settings' && user?.is_admin) {
       fetchSettings();
       fetchTokens();
+      fetchFeedSources();
     }
   }, [activeTab, user?.is_admin]);
+
+  useEffect(() => {
+    if (activeTab === 'members') {
+      fetchUsers();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     const handleImageClick = (e: MouseEvent) => {
@@ -158,6 +182,67 @@ const Home: React.FC = () => {
       setGravatarSource(response.data.gravatar_source || 'https://www.gravatar.com/avatar/');
     } catch (error) {
       console.error('获取设置失败:', error);
+    }
+  };
+
+  const fetchUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const response = await userApi.getUsers();
+      setUsers(response.data || []);
+    } catch (error) {
+      console.error('获取用户列表失败:', error);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const fetchFeedSources = async () => {
+    setFeedSourcesLoading(true);
+    try {
+      const response = await feedApi.getFeedSources();
+      setFeedSources(response.data || []);
+    } catch (error) {
+      console.error('获取广场数据源失败:', error);
+    } finally {
+      setFeedSourcesLoading(false);
+    }
+  };
+
+  const handleCreateFeedSource = async (values: { name: string; url: string }) => {
+    setCreateFeedSourceLoading(true);
+    try {
+      await feedApi.createFeedSource(values);
+      message.success('数据源创建成功');
+      setCreateFeedSourceModalVisible(false);
+      form.resetFields();
+      fetchFeedSources();
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '创建失败');
+    } finally {
+      setCreateFeedSourceLoading(false);
+    }
+  };
+
+  const handleDeleteFeedSource = async (id: number) => {
+    try {
+      await feedApi.deleteFeedSource(id);
+      message.success('数据源已删除');
+      fetchFeedSources();
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '删除失败');
+    }
+  };
+
+  const handleSyncFeedSources = async () => {
+    setSyncLoading(true);
+    try {
+      await feedApi.syncFeedSources();
+      message.success('同步任务已启动');
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '同步失败');
+    } finally {
+      setSyncLoading(false);
     }
   };
 
@@ -263,10 +348,19 @@ const Home: React.FC = () => {
     }
   };
 
-  const handleToggleLike = async (id: number) => {
+  const handleToggleLike = async (id: string | number, isRemote?: boolean, sourceUrl?: string) => {
     const LIKE_COOLDOWN = 10000;
-    const lastLikeKey = `bibibibi_like_${id}`;
+    const storageId = String(id);
+    const lastLikeKey = `bibibibi_like_${storageId}`;
+    const likedKey = `bibibibi_liked_${storageId}`;
+    const likeCountKey = `bibibibi_likecount_${storageId}`;
     const lastLikeTime = localStorage.getItem(lastLikeKey);
+    const isAlreadyLiked = localStorage.getItem(likedKey) === 'true';
+    
+    if (isAlreadyLiked) {
+      message.warning('已点赞，无需重复点赞');
+      return;
+    }
     
     if (lastLikeTime) {
       const elapsed = Date.now() - parseInt(lastLikeTime, 10);
@@ -276,18 +370,31 @@ const Home: React.FC = () => {
       }
     }
     
+    setLikedAnimating(id);
+    
     try {
-      await bibiApi.toggleLike(id);
+      if (isRemote && sourceUrl) {
+        const baseUrl = sourceUrl.replace(/\/$/, '');
+        await axios.post(`${baseUrl}/api/v1/bibis/${id}/like`);
+      } else {
+        await bibiApi.toggleLike(id);
+      }
       localStorage.setItem(lastLikeKey, Date.now().toString());
+      localStorage.setItem(likedKey, 'true');
       setBibis((prev) =>
-        prev.map((b) =>
-          b.id === id
-            ? { ...b, like_count: b.like_count + 1, liked: true }
-            : b
-        )
+        prev.map((b) => {
+          if (String(b.id) === storageId) {
+            const newCount = b.like_count + 1;
+            localStorage.setItem(likeCountKey, newCount.toString());
+            return { ...b, like_count: newCount, liked: true };
+          }
+          return b;
+        })
       );
     } catch (error) {
       console.error('点赞失败:', error);
+    } finally {
+      setTimeout(() => setLikedAnimating(null), 400);
     }
   };
 
@@ -355,7 +462,7 @@ const Home: React.FC = () => {
   const renderCardHeader = (bibi: Bibi, isOwner: boolean) => (
     <div className="flex items-start justify-between">
       <Space size={12}>
-        <Avatar src={bibi.creator.avatar} size={40}>
+        <Avatar src={bibi.creator.avatar} size={40} className="avatar-hover">
           {(bibi.creator.nickname || bibi.creator.username).charAt(0).toUpperCase()}
         </Avatar>
         <div>
@@ -386,24 +493,22 @@ const Home: React.FC = () => {
   const renderCardContent = (bibi: Bibi) => (
     <div className="markdown-body">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{bibi.content}</ReactMarkdown>
-      {bibi.tags && bibi.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-3 mt-3">
-          {bibi.tags.map((tag) => (
-            <Tag key={tag.id} color="blue">#{tag.name}</Tag>
-          ))}
-        </div>
-      )}
     </div>
   );
 
   const renderCardFooter = (bibi: Bibi) => (
     <div className="flex items-center justify-between border-t border-[#f0f0f0] dark:border-[#303030] pt-3 mt-3">
+      <Space size={8} wrap>
+        {bibi.tags && bibi.tags.length > 0 && bibi.tags.map((tag) => (
+          <Tag key={tag.id} color="blue" className="tag-hover m-0">#{tag.name}</Tag>
+        ))}
+      </Space>
       <Space size={16}>
         <Button
           type="text"
           icon={bibi.liked ? <LikeFilled style={{ color: '#ff4d4f' }} /> : <LikeOutlined />}
-          onClick={() => handleToggleLike(bibi.id)}
-          className={bibi.liked ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}
+          onClick={() => handleToggleLike(bibi.id, bibi.is_remote, bibi.source_url)}
+          className={`${bibi.liked ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'} ${likedAnimating === bibi.id ? 'heart-beat' : ''}`}
         >
           {bibi.like_count || 0}
         </Button>
@@ -413,7 +518,7 @@ const Home: React.FC = () => {
           onClick={() => setExpandedComments(expandedComments === bibi.id ? null : bibi.id)}
           className="text-gray-500 dark:text-gray-400"
         >
-          {bibi.comments?.length || 0}
+          {bibi.comment_count || 0}
         </Button>
       </Space>
     </div>
@@ -429,7 +534,7 @@ const Home: React.FC = () => {
     <>
       {showEditor && (
         <Card
-          className="mb-6"
+          className="mb-6 zoom-in"
           title="发布动态"
           extra={<Button onClick={() => setShowEditor(false)}>收起</Button>}
         >
@@ -440,37 +545,45 @@ const Home: React.FC = () => {
         </Card>
       )}
 
-      <Card>
-        <Spin spinning={loading}>
-          {bibis.length === 0 && !loading ? (
-            renderEmpty()
-          ) : (
-            <List
-              dataSource={bibis}
-              renderItem={(bibi) => (
-                <Card
-                  className="mb-4"
-                  bodyStyle={{ padding: '16px' }}
-                  styles={{ body: { padding: '16px' } }}
-                >
-                  {renderCardHeader(bibi, user?.id === bibi.creator.id)}
-                  {renderCardContent(bibi)}
-                  {renderCardFooter(bibi)}
+      <Card className="fade-in">
+        {loading ? (
+          <>
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="mb-4 skeleton-pulse" bodyStyle={{ padding: '16px' }}>
+                <Skeleton active avatar paragraph={{ rows: 2 }} />
+              </Card>
+            ))}
+          </>
+        ) : bibis.length === 0 ? (
+          renderEmpty()
+        ) : (
+          <List
+            dataSource={bibis}
+            renderItem={(bibi) => (
+              <Card
+                className="mb-4 card-hover stagger-item"
+                bodyStyle={{ padding: '16px' }}
+                styles={{ body: { padding: '16px' } }}
+              >
+                {renderCardHeader(bibi, user?.id === bibi.creator.id)}
+                {renderCardContent(bibi)}
+                {renderCardFooter(bibi)}
                   {expandedComments === bibi.id && (
-                    <div className="mt-4 pt-4 border-t border-[#f0f0f0] dark:border-[#303030]">
+                    <div className="mt-4 pt-4 border-t border-[#f0f0f0] dark:border-[#303030] comment-appear">
                       <CommentSection
                         bibiId={bibi.id}
                         comments={bibi.comments || []}
-                        onUpdate={fetchBibis}
+                        onBibiUpdate={fetchBibis}
                         isOwner={user?.id === bibi.creator.id}
+                        isRemote={bibi.is_remote}
+                        remoteSourceUrl={bibi.source_url}
                       />
                     </div>
                   )}
-                </Card>
-              )}
-            />
-          )}
-        </Spin>
+              </Card>
+            )}
+          />
+        )}
       </Card>
 
       {total > 20 && (
@@ -563,6 +676,51 @@ const Home: React.FC = () => {
           </Form.Item>
         </Form>
       </Spin>
+    </Card>
+  );
+
+  const renderMembers = () => (
+    <Card title="成员列表">
+      <Table
+        dataSource={users}
+        rowKey="id"
+        loading={usersLoading}
+        pagination={false}
+        columns={[
+          {
+            title: 'ID',
+            dataIndex: 'id',
+            key: 'id',
+            width: 80,
+          },
+          {
+            title: '用户名',
+            dataIndex: 'username',
+            key: 'username',
+          },
+          {
+            title: '昵称',
+            dataIndex: 'nickname',
+            key: 'nickname',
+          },
+          {
+            title: '邮箱',
+            dataIndex: 'email',
+            key: 'email',
+          },
+          {
+            title: '管理员',
+            dataIndex: 'is_admin',
+            key: 'is_admin',
+            render: (isAdmin: boolean) => isAdmin ? '是' : '否',
+            filters: [
+              { text: '管理员', value: true },
+              { text: '普通用户', value: false },
+            ],
+            onFilter: (value, record) => record.is_admin === value,
+          },
+        ]}
+      />
     </Card>
   );
 
@@ -711,6 +869,51 @@ const Home: React.FC = () => {
           </Form>
         </Modal>
 
+        <Modal
+          title="添加广场数据源"
+          open={createFeedSourceModalVisible}
+          onCancel={() => {
+            setCreateFeedSourceModalVisible(false);
+            form.resetFields();
+          }}
+          footer={null}
+        >
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleCreateFeedSource}
+          >
+            <Form.Item
+              name="name"
+              label="名称"
+              rules={[{ required: true, message: '请输入名称' }]}
+            >
+              <Input placeholder="数据源名称，如：隔壁的bibibibi" />
+            </Form.Item>
+            <Form.Item
+              name="url"
+              label="地址"
+              rules={[{ required: true, message: '请输入实例地址' }]}
+              extra="填写其他 bibibibi 实例的基础 URL，如：https://bibi.example.com"
+            >
+              <Input placeholder="https://bibi.example.com" />
+            </Form.Item>
+            <Form.Item className="mb-0">
+              <Space>
+                <Button type="primary" htmlType="submit" loading={createFeedSourceLoading}>
+                  添加
+                </Button>
+                <Button onClick={() => {
+                  setCreateFeedSourceModalVisible(false);
+                  form.resetFields();
+                }}>
+                  取消
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
+
         {user?.is_admin && (
           <>
             <Divider />
@@ -751,6 +954,73 @@ const Home: React.FC = () => {
                 常用镜像：https://weavatar.com/avatar/ 或 https://cdn.v2ex.com/gravatar/
               </div>
             </div>
+
+            <Divider />
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <div className="font-medium dark:text-white">广场数据源</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">从其他 bibibibi 实例聚合公开笔记</div>
+                </div>
+                <Space>
+                  <Button size="small" onClick={handleSyncFeedSources} loading={syncLoading}>
+                    同步
+                  </Button>
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<PlusOutlined />}
+                    onClick={() => setCreateFeedSourceModalVisible(true)}
+                  >
+                    添加
+                  </Button>
+                </Space>
+              </div>
+              <Spin spinning={feedSourcesLoading}>
+                <Table
+                  dataSource={feedSources}
+                  rowKey="id"
+                  pagination={false}
+                  size="small"
+                  columns={[
+                    {
+                      title: '名称',
+                      dataIndex: 'name',
+                      key: 'name',
+                    },
+                    {
+                      title: '地址',
+                      dataIndex: 'url',
+                      key: 'url',
+                      ellipsis: true,
+                    },
+                    {
+                      title: '最后同步',
+                      dataIndex: 'last_fetch_at',
+                      key: 'last_fetch_at',
+                      width: 180,
+                      render: (text) => text ? new Date(text).toLocaleString('zh-CN') : '从未同步',
+                    },
+                    {
+                      title: '操作',
+                      key: 'action',
+                      width: 80,
+                      render: (_, record) => (
+                        <Button
+                          type="text"
+                          danger
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          onClick={() => handleDeleteFeedSource(record.id)}
+                        />
+                      ),
+                    },
+                  ]}
+                  locale={{ emptyText: '暂无数据源' }}
+                />
+              </Spin>
+            </div>
           </>
         )}
 
@@ -787,6 +1057,12 @@ const Home: React.FC = () => {
       icon: <HomeOutlined />,
       label: '首页',
       onClick: () => setActiveTab('home'),
+    },
+    {
+      key: 'members',
+      icon: <UserOutlined />,
+      label: '成员列表',
+      onClick: () => setActiveTab('members'),
     },
     {
       key: 'settings',
@@ -869,28 +1145,27 @@ const Home: React.FC = () => {
       <Layout style={{ marginLeft: 240 }}>
         <Content style={{ padding: '24px 24px 0', minHeight: '100vh' }}>
           {activeTab === 'home' && (
-            <div>
-              <div className="mb-4">
-                <Segmented
-                  value={homeSubTab}
-                  onChange={(value) => setHomeSubTab(value as any)}
-                  options={user ? [
-                    { label: '我的', value: 'mine' },
-                    { label: '广场', value: 'square' },
-                  ] : [{ label: '广场', value: 'square' }]}
-                  block
-                />
-              </div>
+            <div className="fade-in">
+              <Tabs
+                activeKey={homeSubTab}
+                onChange={(key) => setHomeSubTab(key as any)}
+                size="small"
+                className="mb-4"
+              >
+                {user && <TabPane tab="我的笔记" key="mine" />}
+                <TabPane tab="笔记广场" key="square" />
+              </Tabs>
               {renderNotesList()}
             </div>
           )}
-          {activeTab === 'profile' && renderProfile()}
-          {activeTab === 'settings' && renderSettings()}
+          {activeTab === 'profile' && <div className="fade-in">{renderProfile()}</div>}
+          {activeTab === 'members' && <div className="fade-in">{renderMembers()}</div>}
+          {activeTab === 'settings' && <div className="fade-in">{renderSettings()}</div>}
         </Content>
       </Layout>
 
       {previewImage && (
-        <div className="image-modal-overlay" onClick={() => setPreviewImage(null)}>
+        <div className="image-modal-overlay modal-fade" onClick={() => setPreviewImage(null)}>
           <img src={previewImage} alt="Preview" />
         </div>
       )}

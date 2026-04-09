@@ -31,38 +31,38 @@ func (u *User) AfterFind() error {
 
 // Bibi 笔记模型
 type Bibi struct {
-	ID         uint      `json:"id" gorm:"primaryKey"`
-	CreatorID  uint      `json:"creator_id" gorm:"index;not null"`
-	Content    string    `json:"content" gorm:"type:text;not null"`
-	Visibility string    `json:"visibility" gorm:"size:20;default:PUBLIC"`
-	Pinned     bool      `json:"pinned" gorm:"default:false"`
-	LikeCount  int       `json:"like_count" gorm:"default:0"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-	Creator    User      `json:"creator" gorm:"foreignKey:CreatorID"`
-	Tags       []Tag     `json:"tags" gorm:"many2many:bibi_tags;"`
-	Comments   []Comment `json:"comments" gorm:"foreignKey:BibiID"`
-	Likes      []Like    `json:"likes" gorm:"foreignKey:BibiID"`
+	ID           string    `json:"id" gorm:"primaryKey;size:64"`
+	CreatorID    uint      `json:"creator_id" gorm:"index;not null"`
+	Content      string    `json:"content" gorm:"type:text;not null"`
+	Visibility   string    `json:"visibility" gorm:"size:20;default:PUBLIC"`
+	Pinned       bool      `json:"pinned" gorm:"default:false"`
+	LikeCount    int       `json:"like_count" gorm:"default:0"`
+	CommentCount int       `json:"comment_count" gorm:"default:0"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Creator      User      `json:"creator" gorm:"foreignKey:CreatorID"`
+	Tags         []Tag     `json:"tags" gorm:"many2many:bibi_tags;"`
+	Comments     []Comment `json:"comments" gorm:"foreignKey:BibiID"`
 }
 
 // Tag 标签模型
 type Tag struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
-	Name      string    `json:"name" gorm:"size:64;not null"`
-	CreatorID uint      `json:"creator_id" gorm:"uniqueIndex:idx_creator_name;not null"`
+	Name      string    `json:"name" gorm:"uniqueIndex:idx_creator_name,priority:2;size:64;not null"`
+	CreatorID uint      `json:"creator_id" gorm:"uniqueIndex:idx_creator_name,priority:1;not null"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
 // BibiTag 笔记-标签关联
 type BibiTag struct {
-	BibiID uint `json:"bibi_id" gorm:"primaryKey"`
-	TagID  uint `json:"tag_id" gorm:"primaryKey"`
+	BibiID string `json:"bibi_id" gorm:"primaryKey"`
+	TagID  uint   `json:"tag_id" gorm:"primaryKey"`
 }
 
 // Comment 评论模型
 type Comment struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
-	BibiID    uint      `json:"bibi_id" gorm:"index;not null"`
+	BibiID    string    `json:"bibi_id" gorm:"index;not null"`
 	ParentID  uint      `json:"parent_id" gorm:"index;default:0"`
 	Name      string    `json:"name" gorm:"size:64;not null"`
 	Email     string    `json:"email" gorm:"size:255;not null"`
@@ -94,9 +94,9 @@ func GetGravatarURLWithSource(email, source string) string {
 
 // Like 点赞模型
 type Like struct {
-	ID        uint      `json:"id" gorm:"primaryKey"`
-	BibiID    uint      `json:"bibi_id" gorm:"uniqueIndex:idx_bibi_user;not null"`
-	UserID    uint      `json:"user_id" gorm:"uniqueIndex:idx_bibi_user;not null"`
+	ID        uint   `json:"id" gorm:"primaryKey"`
+	BibiID    string `json:"bibi_id" gorm:"uniqueIndex:idx_bibi_user;not null"`
+	UserID    uint   `json:"user_id" gorm:"uniqueIndex:idx_bibi_user;not null"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -115,4 +115,14 @@ type Token struct {
 	Description string     `json:"description" gorm:"size:255"`
 	ExpiresAt   *time.Time `json:"expires_at"` // nil 表示永不过期
 	CreatedAt   time.Time  `json:"created_at"`
+}
+
+// FeedSource 广场数据源模型
+type FeedSource struct {
+	ID          uint      `json:"id" gorm:"primaryKey"`
+	Name        string    `json:"name" gorm:"size:128;not null"`
+	URL         string    `json:"url" gorm:"size:512;not null"`
+	Enabled     bool      `json:"enabled" gorm:"default:true"`
+	LastFetchAt time.Time `json:"last_fetch_at"`
+	CreatedAt   time.Time `json:"created_at"`
 }

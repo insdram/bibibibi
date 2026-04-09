@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Input, Button, Space, Tag, Select, message } from 'antd';
 import { PlusOutlined, CloseOutlined } from '@ant-design/icons';
 import { tagApi } from '../api';
+import { useAuth } from '../stores/AuthContext';
 
 const { TextArea } = Input;
 
@@ -16,6 +17,7 @@ interface BibiEditorProps {
 }
 
 const BibiEditor: React.FC<BibiEditorProps> = ({ onSubmit, onCancel }) => {
+  const { user } = useAuth();
   const [content, setContent] = useState('');
   const [visibility, setVisibility] = useState<string>('PUBLIC');
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
@@ -30,7 +32,7 @@ const BibiEditor: React.FC<BibiEditorProps> = ({ onSubmit, onCancel }) => {
 
   const fetchTags = async () => {
     try {
-      const response = await tagApi.getTags();
+      const response = await tagApi.getTags({ creator_id: user?.id });
       setTags(response.data || []);
     } catch (error) {
       console.error('获取标签失败:', error);

@@ -1,10 +1,29 @@
 package service
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"time"
+
 	"github.com/bibibibi/bibibibi/internal/model"
 	"github.com/bibibibi/bibibibi/internal/store"
 	"gorm.io/gorm"
 )
+
+// generateBibiID 生成笔记全局唯一 ID
+// 算法: username + timestamp + random -> SHA1
+func generateBibiID(username string) string {
+	timestamp := time.Now().UnixNano()
+	randomBytes := make([]byte, 16)
+	for i := range randomBytes {
+		randomBytes[i] = byte(timestamp >> (i * 8) & 0xFF)
+	}
+	input := fmt.Sprintf("%s:%d:%s", username, timestamp, string(randomBytes))
+	hash := sha1.Sum([]byte(input))
+	return hex.EncodeToString(hash[:])
+}
 
 // getAvatarURL 获取头像 URL（使用系统设置的 Gravatar 源）
 func getAvatarURL(email string) string {
@@ -37,7 +56,17 @@ func NewBibiService() *BibiService {
 func (s *BibiService) CreateBibi(creatorID uint, content, visibility string, tagIDs []uint) (*model.Bibi, error) {
 	db := store.GetDB()
 
+	// 获取创建者用户名
+	var creator model.User
+	if err := db.First(&creator, creatorID).Error; err != nil {
+		return nil, errors.New("用户不存在")
+	}
+
+	// 生成全局唯一 ID
+	bibiID := generateBibiID(creator.Username)
+
 	bibi := model.Bibi{
+		ID:         bibiID,
 		CreatorID:  creatorID,
 		Content:    content,
 		Visibility: visibility,
@@ -71,7 +100,7 @@ func (s *BibiService) CreateBibi(creatorID uint, content, visibility string, tag
 	}
 
 	// 重新查询以加载关联数据
-	if err := db.Preload("Creator").Preload("Tags").Preload("Comments").First(&bibi, bibi.ID).Error; err != nil {
+	if err := db.Preload("Creator").Preload("Tags").Preload("Comments").First(&bibi, "id = ?", bibi.ID).Error; err != nil {
 		return nil, err
 	}
 
@@ -87,10 +116,10 @@ func (s *BibiService) CreateBibi(creatorID uint, content, visibility string, tag
 }
 
 // GetBibiByID 根据ID获取笔记
-func (s *BibiService) GetBibiByID(id uint) (*model.Bibi, error) {
+func (s *BibiService) GetBibiByID(id string) (*model.Bibi, error) {
 	db := store.GetDB()
 	var bibi model.Bibi
-	if err := db.Preload("Creator").Preload("Tags").Preload("Comments").First(&bibi, id).Error; err != nil {
+	if err := db.Preload("Creator").Preload("Tags").Preload("Comments").First(&bibi, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	// 重新生成创建者头像
@@ -100,9 +129,9 @@ func (s *BibiService) GetBibiByID(id uint) (*model.Bibi, error) {
 	for j := range bibi.Comments {
 		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
 	}
+
 	return &bibi, nil
 }
-
 // GetBibis 获取笔记列表
 func (s *BibiService) GetBibis(page, pageSize int, visibility string, creatorID *uint) ([]model.Bibi, int64, error) {
 	db := store.GetDB()
@@ -114,6 +143,9 @@ func (s *BibiService) GetBibis(page, pageSize int, visibility string, creatorID 
 	// 可见性筛选
 	if visibility != "" {
 		query = query.Where("visibility = ?", visibility)
+	} else if creatorID == nil {
+		// 广场默认只显示公开笔记
+		query = query.Where("visibility = 'PUBLIC'")
 	}
 
 	// 创建者筛选
@@ -149,12 +181,16 @@ func (s *BibiService) GetBibis(page, pageSize int, visibility string, creatorID 
 }
 
 // UpdateBibi 更新笔记
-func (s *BibiService) UpdateBibi(id uint, content, visibility string, tagIDs []uint) (*model.Bibi, error) {
+func (s *BibiService) UpdateBibi(id string, content, visibility string, tagIDs []uint, creatorID uint) (*model.Bibi, error) {
 	db := store.GetDB()
 
 	var bibi model.Bibi
-	if err := db.First(&bibi, id).Error; err != nil {
+	if err := db.First(&bibi, "id = ?", id).Error; err != nil {
 		return nil, err
+	}
+
+	if bibi.CreatorID != creatorID {
+		return nil, errors.New("无权操作此笔记")
 	}
 
 	// 更新字段
@@ -194,7 +230,7 @@ func (s *BibiService) UpdateBibi(id uint, content, visibility string, tagIDs []u
 	}
 
 	// 重新查询以加载关联数据
-	if err := db.Preload("Creator").Preload("Tags").Preload("Comments").First(&bibi, bibi.ID).Error; err != nil {
+	if err := db.Preload("Creator").Preload("Tags").Preload("Comments").First(&bibi, "id = ?", bibi.ID).Error; err != nil {
 		return nil, err
 	}
 
@@ -210,8 +246,17 @@ func (s *BibiService) UpdateBibi(id uint, content, visibility string, tagIDs []u
 }
 
 // DeleteBibi 删除笔记
-func (s *BibiService) DeleteBibi(id uint) error {
+func (s *BibiService) DeleteBibi(id string, creatorID uint) error {
 	db := store.GetDB()
+
+	var bibi model.Bibi
+	if err := db.First(&bibi, "id = ?", id).Error; err != nil {
+		return err
+	}
+
+	if bibi.CreatorID != creatorID {
+		return errors.New("无权操作此笔记")
+	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
 		// 删除标签关联
@@ -224,8 +269,13 @@ func (s *BibiService) DeleteBibi(id uint) error {
 			return err
 		}
 
+		// 删除点赞
+		if err := tx.Where("bibi_id = ?", id).Delete(&model.Like{}).Error; err != nil {
+			return err
+		}
+
 		// 删除笔记
-		if err := tx.Delete(&model.Bibi{}, id).Error; err != nil {
+		if err := tx.Delete(&model.Bibi{}, "id = ?", id).Error; err != nil {
 			return err
 		}
 
@@ -234,12 +284,16 @@ func (s *BibiService) DeleteBibi(id uint) error {
 }
 
 // TogglePin 切换置顶状态
-func (s *BibiService) TogglePin(id uint) (*model.Bibi, error) {
+func (s *BibiService) TogglePin(id string, creatorID uint) (*model.Bibi, error) {
 	db := store.GetDB()
 
 	var bibi model.Bibi
-	if err := db.First(&bibi, id).Error; err != nil {
+	if err := db.First(&bibi, "id = ?", id).Error; err != nil {
 		return nil, err
+	}
+
+	if bibi.CreatorID != creatorID {
+		return nil, errors.New("无权操作此笔记")
 	}
 
 	bibi.Pinned = !bibi.Pinned
@@ -248,7 +302,7 @@ func (s *BibiService) TogglePin(id uint) (*model.Bibi, error) {
 	}
 
 	// 重新查询以加载关联数据
-	if err := db.Preload("Creator").Preload("Tags").Preload("Comments").First(&bibi, bibi.ID).Error; err != nil {
+	if err := db.Preload("Creator").Preload("Tags").Preload("Comments").First(&bibi, "id = ?", bibi.ID).Error; err != nil {
 		return nil, err
 	}
 
@@ -285,10 +339,8 @@ func (s *BibiService) SearchBibis(keyword string, page, pageSize int) ([]model.B
 		return nil, 0, err
 	}
 
-	// 重新生成创建者头像
+	// 重新生成创建者头像和评论头像
 	regenerateCreatorAvatars(bibis)
-
-	// 为评论设置 Gravatar 头像
 	for i := range bibis {
 		for j := range bibis[i].Comments {
 			bibis[i].Comments[j].Avatar = getAvatarURL(bibis[i].Comments[j].Email)
