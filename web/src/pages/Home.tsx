@@ -86,6 +86,12 @@ const Home: React.FC = () => {
   const fetchBibis = async () => {
     try {
       setLoading(true);
+      if (homeSubTab === 'mine' && !user) {
+        setBibis([]);
+        setTotal(0);
+        setLoading(false);
+        return;
+      }
       const params: any = { page, page_size: 20 };
       if (homeSubTab === 'mine' && user) {
         params.creator_id = user.id;
