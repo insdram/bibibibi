@@ -123,10 +123,10 @@ const Home: React.FC = () => {
   }, [page, homeSubTab, user, activeTab]);
 
   useEffect(() => {
-    if (activeTab === 'home') {
-      fetchBibis();
+    if (user) {
+      setHomeSubTab('mine');
     }
-  }, [page, homeSubTab, user, activeTab]);
+  }, [user]);
 
   const fetchUserInfo = async () => {
     try {
