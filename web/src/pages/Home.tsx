@@ -62,7 +62,7 @@ const Home: React.FC = () => {
   const [expandedComments, setExpandedComments] = useState<string | number | null>(null);
   const [likedAnimating, setLikedAnimating] = useState<string | number | null>(null);
   const [activeTab, setActiveTab] = useState('home');
-  const [homeSubTab, setHomeSubTab] = useState<'square' | 'mine'>('square');
+  const [homeSubTab, setHomeSubTab] = useState<'square' | 'mine'>('mine');
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
@@ -1160,7 +1160,7 @@ const Home: React.FC = () => {
                 className="mb-4"
               >
                 <TabPane tab="我的笔记" key="mine" />
-                <TabPane tab="笔记广场" key="square" />
+                {user && <TabPane tab="笔记广场" key="square" />}
               </Tabs>
               {renderNotesList()}
             </div>
