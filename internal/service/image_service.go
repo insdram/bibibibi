@@ -23,7 +23,7 @@ const (
 	imgWidth  = 400
 	imgHeight = 300
 	fontURL   = "https://github.com/adobe-fonts/source-han-sans/raw/release/OTF/SimplifiedChinese/SourceHanSansSC-Regular.otf"
-	fontPath  = "/tmp/SourceHanSansSC-Regular.otf"
+	fontPath  = "/app/fonts/SourceHanSansSC-Regular.otf"
 )
 
 var loadedFont font.Face
@@ -39,6 +39,7 @@ func loadFont() (font.Face, error) {
 
 	_, err := os.Stat(fontPath)
 	if os.IsNotExist(err) {
+		os.MkdirAll(filepath.Dir(fontPath), 0755)
 		resp, err := http.Get(fontURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to download font: %w", err)
