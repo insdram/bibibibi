@@ -29,13 +29,39 @@ func NewImageService() *ImageService {
 func (s *ImageService) GetLatestPublicBibi() (*model.Bibi, error) {
 	db := store.GetDB()
 	var bibi model.Bibi
-	if err := db.Preload("Creator").Preload("Tags").
-		Where("visibility = 'PUBLIC'").
+	err := db.Preload("Creator").Preload("Tags").
+		Where("visibility = ?", "PUBLIC").
 		Order("created_at DESC").
-		First(&bibi).Error; err != nil {
+		First(&bibi).Error
+	if err != nil {
 		return nil, err
 	}
 	return &bibi, nil
+}
+
+func (s *ImageService) GeneratePlaceholderImage(message string) ([]byte, error) {
+	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
+
+	bgColor := color.RGBA{R: 250, G: 250, B: 250, A: 255}
+	drawRect(img, 0, 0, imgWidth, imgHeight, bgColor)
+
+	d := &font.Drawer{
+		Dst:  img,
+		Src:  image.NewUniform(color.RGBA{R: 153, G: 153, B: 153, A: 255}),
+		Face: basicfont.Face7x13,
+	}
+
+	lines := wrapText(message, 40)
+	yPos := imgHeight / 2
+	for i, line := range lines {
+		d.DrawString(line, fixed.P(20, yPos-int(len(lines)/2)*20+i*20))
+	}
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {

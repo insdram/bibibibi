@@ -927,7 +927,10 @@ func handleGetRemoteBibis(c *gin.Context) {
 func handleGetLatestBibiCard(c *gin.Context) {
 	bibi, err := imageService.GetLatestPublicBibi()
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "暂无笔记"})
+		imgData, _ := imageService.GeneratePlaceholderImage("暂无笔记\n广场还没有发布任何笔记")
+		c.Header("Content-Type", "image/png")
+		c.Header("Content-Disposition", "inline")
+		c.Data(http.StatusOK, "image/png", imgData)
 		return
 	}
 
