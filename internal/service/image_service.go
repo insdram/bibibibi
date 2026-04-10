@@ -104,10 +104,6 @@ func (s *ImageService) GeneratePlaceholderImage(message string) ([]byte, error) 
 	face := basicfont.Face7x13
 	col := color.RGBA{R: 153, G: 153, B: 153, A: 255}
 
-	pointSize := fixed.I(13)
-	fm := face.Metrics()
-	baseline := pointSize.Ceil() - fm.Descent.Ceil()
-
 	lines := wrapText(message, 40)
 	yPos := (imgHeight - len(lines)*18) / 2
 	for _, line := range lines {
