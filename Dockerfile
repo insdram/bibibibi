@@ -9,13 +9,14 @@ COPY web/ ./
 RUN npm run build
 
 # 第二阶段：构建后端
-FROM golang:1.22 AS backend-builder
+FROM golang:1.25 AS backend-builder
 WORKDIR /app
 ENV GOPROXY=https://goproxy.cn,direct
 RUN apt-get update && apt-get install -y gcc musl-dev && rm -rf /var/lib/apt/lists/*
 COPY go.mod ./
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
+COPY MiSans-Regular.ttf /app/fonts/MiSans-Regular.ttf
 RUN go mod tidy && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o bibibibi ./cmd/bibibibi
 
 # 第三阶段：运行

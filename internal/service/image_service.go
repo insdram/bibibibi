@@ -2,22 +2,56 @@ package service
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/bibibibi/bibibibi/internal/model"
 	"github.com/bibibibi/bibibibi/internal/store"
 	"golang.org/x/image/bmp"
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/font/truetype"
 	"golang.org/x/image/math/fixed"
 )
 
 const (
 	imgWidth  = 400
 	imgHeight = 300
+	fontPath  = "/app/fonts/MiSans-Regular.ttf"
 )
+
+var loadedFont font.Face
+
+func init() {
+	os.MkdirAll(filepath.Dir(fontPath), 0755)
+}
+
+func loadFont() (font.Face, error) {
+	if loadedFont != nil {
+		return loadedFont, nil
+	}
+
+	f, err := os.ReadFile(fontPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read font file: %w", err)
+	}
+
+	ttfFont, err := truetype.Parse(f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse font: %w", err)
+	}
+
+	loadedFont = truetype.NewFace(ttfFont, &truetype.Options{
+		Size:    14,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
+
+	return loadedFont, nil
+}
 
 type ImageService struct{}
 
@@ -39,7 +73,11 @@ func (s *ImageService) GetLatestPublicBibi() (*model.Bibi, error) {
 }
 
 func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
-	face := basicfont.Face7x13
+	face, err := loadFont()
+	if err != nil {
+		return nil, err
+	}
+
 	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
 
 	setRect(img, 0, 0, imgWidth, imgHeight, color.RGBA{255, 255, 255, 255})
@@ -52,7 +90,7 @@ func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
 	dateStr := bibi.CreatedAt.Format("2006-01-02 15:04")
 
 	content := stripMarkdown(bibi.Content)
-	contentLines := wrapText(content, 26)
+	contentLines := wrapText(content, 22)
 
 	var tagsStr string
 	if len(bibi.Tags) > 0 {
@@ -101,7 +139,11 @@ func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
 }
 
 func (s *ImageService) GeneratePlaceholderImage(message string) ([]byte, error) {
-	face := basicfont.Face7x13
+	face, err := loadFont()
+	if err != nil {
+		return nil, err
+	}
+
 	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
 	setRect(img, 0, 0, imgWidth, imgHeight, color.RGBA{250, 250, 250, 255})
 
