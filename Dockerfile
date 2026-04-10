@@ -9,7 +9,7 @@ COPY web/ ./
 RUN npm run build
 
 # 第二阶段：构建后端
-FROM golang:1.22 AS backend-builder
+FROM golang:1.25 AS backend-builder
 WORKDIR /app
 ENV GOPROXY=https://goproxy.cn,direct
 RUN apt-get update && apt-get install -y gcc musl-dev && rm -rf /var/lib/apt/lists/*

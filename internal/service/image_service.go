@@ -2,23 +2,78 @@ package service
 
 import (
 	"bytes"
-	"encoding/binary"
+	"fmt"
 	"image"
 	"image/color"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/bibibibi/bibibibi/internal/model"
 	"github.com/bibibibi/bibibibi/internal/store"
 	"golang.org/x/image/bmp"
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/font/truetype"
 	"golang.org/x/image/math/fixed"
 )
 
 const (
 	imgWidth  = 400
 	imgHeight = 300
+	fontURL   = "https://github.com/adobe-fonts/source-han-sans/raw/release/OTF/SimplifiedChinese/SourceHanSansSC-Regular.otf"
+	fontPath  = "/tmp/SourceHanSansSC-Regular.otf"
 )
+
+var loadedFont font.Face
+
+func init() {
+	os.MkdirAll(filepath.Dir(fontPath), 0755)
+}
+
+func loadFont() (font.Face, error) {
+	if loadedFont != nil {
+		return loadedFont, nil
+	}
+
+	_, err := os.Stat(fontPath)
+	if os.IsNotExist(err) {
+		resp, err := http.Get(fontURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to download font: %w", err)
+		}
+		defer resp.Body.Close()
+
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read font data: %w", err)
+		}
+
+		err = os.WriteFile(fontPath, data, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write font file: %w", err)
+		}
+	}
+
+	f, err := os.ReadFile(fontPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read font file: %w", err)
+	}
+
+	ttfFont, err := truetype.Parse(f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse font: %w", err)
+	}
+
+	loadedFont = truetype.NewFace(ttfFont, &truetype.Options{
+		Size:    14,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
+
+	return loadedFont, nil
+}
 
 type ImageService struct{}
 
@@ -40,6 +95,11 @@ func (s *ImageService) GetLatestPublicBibi() (*model.Bibi, error) {
 }
 
 func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
+	face, err := loadFont()
+	if err != nil {
+		return nil, err
+	}
+
 	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
 
 	setRect(img, 0, 0, imgWidth, imgHeight, color.RGBA{255, 255, 255, 255})
@@ -52,7 +112,7 @@ func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
 	dateStr := bibi.CreatedAt.Format("2006-01-02 15:04")
 
 	content := stripMarkdown(bibi.Content)
-	contentLines := wrapText(content, 26)
+	contentLines := wrapText(content, 22)
 
 	var tagsStr string
 	if len(bibi.Tags) > 0 {
@@ -63,47 +123,55 @@ func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
 		tagsStr = strings.Join(tagNames, " ")
 	}
 
-	face := basicfont.Face7x13
-	d := &font.Drawer{
-		Dst:  img,
-		Src:  image.NewUniform(color.RGBA{51, 51, 51, 255}),
+	drawer := &font.Drawer{
+		Dst: img,
 		Face: face,
-		Dot:  fixed.P(15, 25),
 	}
-	d.DrawString(title)
 
-	d.Src = image.NewUniform(color.RGBA{153, 153, 153, 255})
-	d.Dot = fixed.P(15, 45)
-	d.DrawString(dateStr)
+	drawer.Src = image.NewUniform(color.RGBA{51, 51, 51, 255})
+	drawer.Dot = fixed.P(15, 25)
+	drawer.DrawString(title)
 
-	d.Src = image.NewUniform(color.RGBA{51, 51, 51, 255})
+	drawer.Src = image.NewUniform(color.RGBA{153, 153, 153, 255})
+	drawer.Dot = fixed.P(15, 45)
+	drawer.DrawString(dateStr)
+
+	drawer.Src = image.NewUniform(color.RGBA{51, 51, 51, 255})
 	yPos := 75
 	for _, line := range contentLines {
 		if yPos > imgHeight-40 {
 			break
 		}
-		d.Dot = fixed.P(15, yPos)
-		d.DrawString(line)
+		drawer.Dot = fixed.P(15, yPos)
+		drawer.DrawString(line)
 		yPos += 20
 	}
 
 	if tagsStr != "" {
-		d.Src = image.NewUniform(color.RGBA{24, 144, 255, 255})
-		d.Dot = fixed.P(15, imgHeight-15)
-		d.DrawString(tagsStr)
+		drawer.Src = image.NewUniform(color.RGBA{24, 144, 255, 255})
+		drawer.Dot = fixed.P(15, imgHeight-15)
+		drawer.DrawString(tagsStr)
 	}
 
-	return encodeBMP(img)
+	var buf bytes.Buffer
+	if err := bmp.Encode(&buf, img); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func (s *ImageService) GeneratePlaceholderImage(message string) ([]byte, error) {
+	face, err := loadFont()
+	if err != nil {
+		return nil, err
+	}
+
 	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
 	setRect(img, 0, 0, imgWidth, imgHeight, color.RGBA{250, 250, 250, 255})
 
 	lines := wrapText(message, 20)
-	face := basicfont.Face7x13
 
-	d := &font.Drawer{
+	drawer := &font.Drawer{
 		Dst:  img,
 		Src:  image.NewUniform(color.RGBA{153, 153, 153, 255}),
 		Face: face,
@@ -112,11 +180,15 @@ func (s *ImageService) GeneratePlaceholderImage(message string) ([]byte, error) 
 	yPos := imgHeight / 2
 	startOffset := len(lines) * 10
 	for i, line := range lines {
-		d.Dot = fixed.P(20, yPos-startOffset+i*20)
-		d.DrawString(line)
+		drawer.Dot = fixed.P(20, yPos-startOffset+i*20)
+		drawer.DrawString(line)
 	}
 
-	return encodeBMP(img)
+	var buf bytes.Buffer
+	if err := bmp.Encode(&buf, img); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func setRect(img *image.RGBA, x1, y1, x2, y2 int, c color.Color) {
@@ -127,47 +199,6 @@ func setRect(img *image.RGBA, x1, y1, x2, y2 int, c color.Color) {
 			}
 		}
 	}
-}
-
-func encodeBMP(img *image.RGBA) ([]byte, error) {
-	var buf bytes.Buffer
-
-	fileHeader := make([]byte, 14)
-	binary.LittleEndian.PutUint16(fileHeader[0:2], 0x4D42)
-
-	rowSize := imgWidth * 4
-	imageSize := uint32(rowSize * imgHeight)
-	fileSize := uint32(14 + 40 + imageSize)
-
-	binary.LittleEndian.PutUint32(fileHeader[2:6], fileSize)
-	binary.LittleEndian.PutUint32(fileHeader[10:14], 14+40)
-
-	infoHeader := make([]byte, 40)
-	binary.LittleEndian.PutUint32(infoHeader[0:4], 40)
-	binary.LittleEndian.PutInt32(infoHeader[4:8], int32(imgWidth))
-	binary.LittleEndian.PutInt32(infoHeader[8:12], int32(imgHeight))
-	binary.LittleEndian.PutUint16(infoHeader[12:14], 1)
-	binary.LittleEndian.PutUint16(infoHeader[14:16], 32)
-	binary.LittleEndian.PutUint32(infoHeader[20:24], 0)
-	binary.LittleEndian.PutUint32(infoHeader[24:28], imageSize)
-
-	buf.Write(fileHeader)
-	buf.Write(infoHeader)
-
-	pixels := make([]byte, imgWidth*imgHeight*4)
-	for y := imgHeight - 1; y >= 0; y-- {
-		for x := 0; x < imgWidth; x++ {
-			c := img.RGBAAt(x, y)
-			offset := (y*imgWidth + x) * 4
-			pixels[offset] = c.B
-			pixels[offset+1] = c.G
-			pixels[offset+2] = c.R
-			pixels[offset+3] = c.A
-		}
-	}
-	buf.Write(pixels)
-
-	return buf.Bytes(), nil
 }
 
 func stripMarkdown(text string) string {
