@@ -39,71 +39,42 @@ func (s *ImageService) GetLatestPublicBibi() (*model.Bibi, error) {
 	return &bibi, nil
 }
 
-func (s *ImageService) GeneratePlaceholderImage(message string) ([]byte, error) {
-	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
-
-	bgColor := color.RGBA{R: 250, G: 250, B: 250, A: 255}
-	drawRect(img, 0, 0, imgWidth, imgHeight, bgColor)
-
-	d := &font.Drawer{
-		Dst:  img,
-		Src:  image.NewUniform(color.RGBA{R: 153, G: 153, B: 153, A: 255}),
-		Face: basicfont.Face7x13,
-	}
-
-	lines := wrapText(message, 40)
-	yPos := imgHeight / 2
-	for i, line := range lines {
-		d.DrawString(line, fixed.P(20, yPos-int(len(lines)/2)*20+i*20))
-	}
-
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
 func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
 	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
 
 	bgColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
-	drawRect(img, 0, 0, imgWidth, imgHeight, bgColor)
-
-	borderColor := color.RGBA{R: 240, G: 240, B: 240, A: 255}
-	drawRect(img, 0, 0, imgWidth, 1, borderColor)
-	drawRect(img, 0, imgHeight-1, imgWidth, imgHeight, borderColor)
-	drawRect(img, 0, 0, 1, imgHeight, borderColor)
-	drawRect(img, imgWidth-1, 0, imgWidth, imgHeight, borderColor)
+	clearRect(img, bgColor)
 
 	headerBgColor := color.RGBA{R: 245, G: 245, B: 245, A: 255}
-	drawRect(img, 1, 1, imgWidth-1, 52, headerBgColor)
+	clearRectAt(img, 1, 1, imgWidth-1, 51, headerBgColor)
 
-	d := &font.Drawer{
-		Dst:  img,
-		Src:  image.NewUniform(color.RGBA{R: 51, G: 51, B: 51, A: 255}),
-		Face: basicfont.Face7x13,
-	}
+	face := basicfont.Face7x13
+	black := color.RGBA{R: 51, G: 51, B: 51, A: 255}
+	gray := color.RGBA{R: 153, G: 153, B: 153, A: 255}
+	blue := color.RGBA{R: 24, G: 144, B: 255, A: 255}
+
+	pointSize := fixed.I(13)
+	fm := face.Metrics()
+	baseline := pointSize.Ceil() - fm.Descent.Ceil()
 
 	title := bibi.Creator.Nickname
 	if title == "" {
 		title = bibi.Creator.Username
 	}
-	d.DrawString(title, fixed.P(15, 20))
+	drawStringAt(img, face, black, 15, baseline, title)
 
-	d.Src = image.NewUniform(color.RGBA{R: 153, G: 153, B: 153, A: 255})
-	d.DrawString(bibi.CreatedAt.Format("2006-01-02 15:04"), fixed.P(15, 38))
+	dateStr := bibi.CreatedAt.Format("2006-01-02 15:04")
+	drawStringAt(img, face, gray, 15, baseline+18, dateStr)
 
 	content := stripMarkdown(bibi.Content)
 	contentLines := wrapText(content, 48)
-	d.Src = image.NewUniform(color.RGBA{R: 51, G: 51, B: 51, A: 255})
-	yPos := 70
+	yPos := baseline + 52
 	for _, line := range contentLines {
-		if yPos > imgHeight-50 {
+		if yPos > imgHeight-35 {
 			break
 		}
 		if len(line) > 0 {
-			d.DrawString(line, fixed.P(15, yPos))
+			drawStringAt(img, face, black, 15, yPos, line)
 		}
 		yPos += 18
 	}
@@ -114,8 +85,7 @@ func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
 			tagNames = append(tagNames, "#"+tag.Name)
 		}
 		tagsStr := strings.Join(tagNames, " ")
-		d.Src = image.NewUniform(color.RGBA{R: 24, G: 144, B: 255, A: 255})
-		d.DrawString(tagsStr, fixed.P(15, imgHeight-15))
+		drawStringAt(img, face, blue, 15, imgHeight-15, tagsStr)
 	}
 
 	var buf bytes.Buffer
@@ -125,7 +95,42 @@ func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func drawRect(img *image.RGBA, x1, y1, x2, y2 int, c color.Color) {
+func (s *ImageService) GeneratePlaceholderImage(message string) ([]byte, error) {
+	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
+
+	bgColor := color.RGBA{R: 250, G: 250, B: 250, A: 255}
+	clearRect(img, bgColor)
+
+	face := basicfont.Face7x13
+	col := color.RGBA{R: 153, G: 153, B: 153, A: 255}
+
+	pointSize := fixed.I(13)
+	fm := face.Metrics()
+	baseline := pointSize.Ceil() - fm.Descent.Ceil()
+
+	lines := wrapText(message, 40)
+	yPos := (imgHeight - len(lines)*18) / 2
+	for _, line := range lines {
+		drawStringAt(img, face, col, 20, yPos, line)
+		yPos += 18
+	}
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func clearRect(img *image.RGBA, c color.Color) {
+	for y := 0; y < imgHeight; y++ {
+		for x := 0; x < imgWidth; x++ {
+			img.Set(x, y, c)
+		}
+	}
+}
+
+func clearRectAt(img *image.RGBA, x1, y1, x2, y2 int, c color.Color) {
 	for y := y1; y < y2; y++ {
 		for x := x1; x < x2; x++ {
 			if x >= 0 && x < imgWidth && y >= 0 && y < imgHeight {
@@ -133,6 +138,16 @@ func drawRect(img *image.RGBA, x1, y1, x2, y2 int, c color.Color) {
 			}
 		}
 	}
+}
+
+func drawStringAt(img *image.RGBA, face font.Face, c color.Color, x, y int, s string) {
+	d := &font.Drawer{
+		Dst:  img,
+		Src:  image.NewUniform(c),
+		Face: face,
+		Dot:  fixed.P(x, y),
+	}
+	d.DrawString(s)
 }
 
 func stripMarkdown(text string) string {
