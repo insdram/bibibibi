@@ -22,6 +22,7 @@ var (
 	systemService  = service.NewSystemService()
 	tokenService   = service.NewTokenService()
 	feedService    = service.NewFeedService()
+	imageService   = service.NewImageService()
 )
 
 // corsMiddleware CORS 中间件
@@ -127,6 +128,9 @@ func RegisterRoutes(r *gin.Engine) {
 
 		// 公开的远程笔记（用于广场）
 		api.GET("/public/remote-bibis", handleGetRemoteBibis)
+
+		// 广场最新笔记图片（400x300 BMP）
+		api.GET("/public/latest-bibi-card", handleGetLatestBibiCard)
 	}
 }
 
@@ -917,4 +921,23 @@ func handleGetRemoteBibis(c *gin.Context) {
 		"bibis": bibis,
 		"total": len(bibis),
 	})
+}
+
+// handleGetLatestBibiCard 获取广场最新笔记的图片（400x300 PNG）
+func handleGetLatestBibiCard(c *gin.Context) {
+	bibi, err := imageService.GetLatestPublicBibi()
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "暂无笔记"})
+		return
+	}
+
+	imgData, err := imageService.GenerateBibiCardImage(bibi)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成图片失败"})
+		return
+	}
+
+	c.Header("Content-Type", "image/png")
+	c.Header("Content-Disposition", "inline")
+	c.Data(http.StatusOK, "image/png", imgData)
 }
