@@ -2,23 +2,75 @@ package service
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/bibibibi/bibibibi/internal/model"
 	"github.com/bibibibi/bibibibi/internal/store"
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/font/truetype"
 	"golang.org/x/image/math/fixed"
 )
 
 const (
 	imgWidth  = 400
 	imgHeight = 300
+	fontURL   = "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
+	fontPath  = "/tmp/NotoSansCJKsc-Regular.otf"
 )
+
+var loadedFont font.Face
+
+func loadFont() (font.Face, error) {
+	if loadedFont != nil {
+		return loadedFont, nil
+	}
+
+	_, err := os.Stat(fontPath)
+	if os.IsNotExist(err) {
+		resp, err := http.Get(fontURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to download font: %w", err)
+		}
+		defer resp.Body.Close()
+
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read font data: %w", err)
+		}
+
+		err = os.WriteFile(fontPath, data, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write font file: %w", err)
+		}
+	}
+
+	f, err := os.ReadFile(fontPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read font file: %w", err)
+	}
+
+	ttfFont, err := truetype.Parse(f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse font: %w", err)
+	}
+
+	loadedFont = truetype.NewFace(ttfFont, &truetype.Options{
+		Size:    14,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
+
+	return loadedFont, nil
+}
 
 type ImageService struct{}
 
@@ -40,6 +92,11 @@ func (s *ImageService) GetLatestPublicBibi() (*model.Bibi, error) {
 }
 
 func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
+	face, err := loadFont()
+	if err != nil {
+		return nil, err
+	}
+
 	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
 
 	bgColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
@@ -48,14 +105,12 @@ func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
 	headerBgColor := color.RGBA{R: 245, G: 245, B: 245, A: 255}
 	clearRectAt(img, 1, 1, imgWidth-1, 51, headerBgColor)
 
-	face := basicfont.Face7x13
 	black := color.RGBA{R: 51, G: 51, B: 51, A: 255}
 	gray := color.RGBA{R: 153, G: 153, B: 153, A: 255}
 	blue := color.RGBA{R: 24, G: 144, B: 255, A: 255}
 
-	pointSize := fixed.I(13)
 	fm := face.Metrics()
-	baseline := pointSize.Ceil() - fm.Descent.Ceil()
+	baseline := 20
 
 	title := bibi.Creator.Nickname
 	if title == "" {
@@ -64,19 +119,20 @@ func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
 	drawStringAt(img, face, black, 15, baseline, title)
 
 	dateStr := bibi.CreatedAt.Format("2006-01-02 15:04")
-	drawStringAt(img, face, gray, 15, baseline+18, dateStr)
+	drawStringAt(img, face, gray, 15, baseline+20, dateStr)
 
 	content := stripMarkdown(bibi.Content)
-	contentLines := wrapText(content, 48)
-	yPos := baseline + 52
+	contentLines := wrapText(content, 26)
+	yPos := baseline + 55
+	lineHeight := 22
 	for _, line := range contentLines {
-		if yPos > imgHeight-35 {
+		if yPos > imgHeight-40 {
 			break
 		}
 		if len(line) > 0 {
 			drawStringAt(img, face, black, 15, yPos, line)
 		}
-		yPos += 18
+		yPos += lineHeight
 	}
 
 	if len(bibi.Tags) > 0 {
@@ -85,7 +141,7 @@ func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
 			tagNames = append(tagNames, "#"+tag.Name)
 		}
 		tagsStr := strings.Join(tagNames, " ")
-		drawStringAt(img, face, blue, 15, imgHeight-15, tagsStr)
+		drawStringAt(img, face, blue, 15, imgHeight-20, tagsStr)
 	}
 
 	var buf bytes.Buffer
@@ -96,19 +152,25 @@ func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
 }
 
 func (s *ImageService) GeneratePlaceholderImage(message string) ([]byte, error) {
+	face, err := loadFont()
+	if err != nil {
+		return nil, err
+	}
+
 	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
 
 	bgColor := color.RGBA{R: 250, G: 250, B: 250, A: 255}
 	clearRect(img, bgColor)
 
-	face := basicfont.Face7x13
 	col := color.RGBA{R: 153, G: 153, B: 153, A: 255}
 
-	lines := wrapText(message, 40)
-	yPos := (imgHeight - len(lines)*18) / 2
+	lines := wrapText(message, 20)
+	lineHeight := 22
+	totalHeight := len(lines) * lineHeight
+	yPos := (imgHeight - totalHeight) / 2
 	for _, line := range lines {
 		drawStringAt(img, face, col, 20, yPos, line)
-		yPos += 18
+		yPos += lineHeight
 	}
 
 	var buf bytes.Buffer
@@ -202,4 +264,8 @@ func wrapText(text string, maxChars int) []string {
 	}
 
 	return result
+}
+
+func init() {
+	os.MkdirAll(filepath.Dir(fontPath), 0755)
 }
