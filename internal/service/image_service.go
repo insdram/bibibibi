@@ -1,76 +1,17 @@
 package service
 
 import (
-	"bytes"
 	"fmt"
-	"image"
-	"image/color"
-	"image/png"
-	"io"
-	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/bibibibi/bibibibi/internal/model"
 	"github.com/bibibibi/bibibibi/internal/store"
-	"golang.org/x/image/font"
-	"golang.org/x/image/font/truetype"
-	"golang.org/x/image/math/fixed"
 )
 
 const (
 	imgWidth  = 400
 	imgHeight = 300
-	fontURL   = "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
-	fontPath  = "/tmp/NotoSansCJKsc-Regular.otf"
 )
-
-var loadedFont font.Face
-
-func loadFont() (font.Face, error) {
-	if loadedFont != nil {
-		return loadedFont, nil
-	}
-
-	_, err := os.Stat(fontPath)
-	if os.IsNotExist(err) {
-		resp, err := http.Get(fontURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed to download font: %w", err)
-		}
-		defer resp.Body.Close()
-
-		data, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read font data: %w", err)
-		}
-
-		err = os.WriteFile(fontPath, data, 0644)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write font file: %w", err)
-		}
-	}
-
-	f, err := os.ReadFile(fontPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read font file: %w", err)
-	}
-
-	ttfFont, err := truetype.Parse(f)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse font: %w", err)
-	}
-
-	loadedFont = truetype.NewFace(ttfFont, &truetype.Options{
-		Size:    14,
-		DPI:     72,
-		Hinting: font.HintingFull,
-	})
-
-	return loadedFont, nil
-}
 
 type ImageService struct{}
 
@@ -92,120 +33,73 @@ func (s *ImageService) GetLatestPublicBibi() (*model.Bibi, error) {
 }
 
 func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
-	face, err := loadFont()
-	if err != nil {
-		return nil, err
-	}
-
-	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
-
-	bgColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
-	clearRect(img, bgColor)
-
-	headerBgColor := color.RGBA{R: 245, G: 245, B: 245, A: 255}
-	clearRectAt(img, 1, 1, imgWidth-1, 51, headerBgColor)
-
-	black := color.RGBA{R: 51, G: 51, B: 51, A: 255}
-	gray := color.RGBA{R: 153, G: 153, B: 153, A: 255}
-	blue := color.RGBA{R: 24, G: 144, B: 255, A: 255}
-
-	fm := face.Metrics()
-	baseline := 20
-
 	title := bibi.Creator.Nickname
 	if title == "" {
 		title = bibi.Creator.Username
 	}
-	drawStringAt(img, face, black, 15, baseline, title)
-
 	dateStr := bibi.CreatedAt.Format("2006-01-02 15:04")
-	drawStringAt(img, face, gray, 15, baseline+20, dateStr)
-
 	content := stripMarkdown(bibi.Content)
-	contentLines := wrapText(content, 26)
-	yPos := baseline + 55
-	lineHeight := 22
-	for _, line := range contentLines {
-		if yPos > imgHeight-40 {
-			break
-		}
-		if len(line) > 0 {
-			drawStringAt(img, face, black, 15, yPos, line)
-		}
-		yPos += lineHeight
-	}
+	contentLines := wrapText(content, 28)
 
+	var tagsStr string
 	if len(bibi.Tags) > 0 {
 		var tagNames []string
 		for _, tag := range bibi.Tags {
 			tagNames = append(tagNames, "#"+tag.Name)
 		}
-		tagsStr := strings.Join(tagNames, " ")
-		drawStringAt(img, face, blue, 15, imgHeight-20, tagsStr)
+		tagsStr = strings.Join(tagNames, " ")
 	}
 
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
-		return nil, err
+	var contentSVG string
+	for i, line := range contentLines {
+		if i > 10 {
+			break
+		}
+		contentSVG += fmt.Sprintf(`  <text x="15" y="%d" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="13" fill="#333">%s</text>`+"\n", 85+i*20, escapeXML(line))
 	}
-	return buf.Bytes(), nil
+
+	var tagsSVG string
+	if tagsStr != "" {
+		tagsSVG = fmt.Sprintf(`  <text x="15" y="285" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="13" fill="#1890ff">%s</text>`, escapeXML(tagsStr))
+	}
+
+	svg := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%%" height="100%%" fill="white"/>
+  <rect x="0" y="0" width="%d" height="52" fill="#f5f5f5"/>
+  <text x="15" y="25" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="bold" fill="#333">%s</text>
+  <text x="15" y="45" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12" fill="#999">%s</text>
+%s
+%s
+</svg>`, imgWidth, imgHeight, imgWidth, escapeXML(title), escapeXML(dateStr), contentSVG, tagsSVG)
+
+	return []byte(svg), nil
 }
 
 func (s *ImageService) GeneratePlaceholderImage(message string) ([]byte, error) {
-	face, err := loadFont()
-	if err != nil {
-		return nil, err
-	}
-
-	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
-
-	bgColor := color.RGBA{R: 250, G: 250, B: 250, A: 255}
-	clearRect(img, bgColor)
-
-	col := color.RGBA{R: 153, G: 153, B: 153, A: 255}
-
 	lines := wrapText(message, 20)
-	lineHeight := 22
-	totalHeight := len(lines) * lineHeight
-	yPos := (imgHeight - totalHeight) / 2
-	for _, line := range lines {
-		drawStringAt(img, face, col, 20, yPos, line)
-		yPos += lineHeight
+	var contentSVG string
+	startY := imgHeight / 2
+	for i, line := range lines {
+		contentSVG += fmt.Sprintf(`  <text x="200" y="%d" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="13" fill="#999" text-anchor="middle">%s</text>`+"\n", startY+i*22-len(lines)*11, escapeXML(line))
 	}
 
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	svg := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%%" height="100%%" fill="#fafafa"/>
+%s
+</svg>`, imgWidth, imgHeight, contentSVG)
+
+	return []byte(svg), nil
 }
 
-func clearRect(img *image.RGBA, c color.Color) {
-	for y := 0; y < imgHeight; y++ {
-		for x := 0; x < imgWidth; x++ {
-			img.Set(x, y, c)
-		}
-	}
-}
-
-func clearRectAt(img *image.RGBA, x1, y1, x2, y2 int, c color.Color) {
-	for y := y1; y < y2; y++ {
-		for x := x1; x < x2; x++ {
-			if x >= 0 && x < imgWidth && y >= 0 && y < imgHeight {
-				img.Set(x, y, c)
-			}
-		}
-	}
-}
-
-func drawStringAt(img *image.RGBA, face font.Face, c color.Color, x, y int, s string) {
-	d := &font.Drawer{
-		Dst:  img,
-		Src:  image.NewUniform(c),
-		Face: face,
-		Dot:  fixed.P(x, y),
-	}
-	d.DrawString(s)
+func escapeXML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "'", "&apos;")
+	return s
 }
 
 func stripMarkdown(text string) string {
@@ -237,35 +131,28 @@ func wrapText(text string, maxChars int) []string {
 			continue
 		}
 
-		words := strings.Fields(line)
-		var current strings.Builder
-		count := 0
-
-		for _, word := range words {
-			wordLen := utf8.RuneCountInString(word)
-			if current.Len() == 0 {
-				current.WriteString(word)
-				count = wordLen
-			} else if count+1+wordLen <= maxChars {
-				current.WriteString(" ")
-				current.WriteString(word)
-				count += 1 + wordLen
-			} else {
-				result = append(result, current.String())
-				current.Reset()
-				current.WriteString(word)
-				count = wordLen
-			}
+		if len([]rune(line)) <= maxChars {
+			result = append(result, line)
+			continue
 		}
 
-		if current.Len() > 0 {
-			result = append(result, current.String())
+		runes := []rune(line)
+		var current string
+		var currentLen int
+		for _, r := range runes {
+			if currentLen+1 > maxChars {
+				result = append(result, current)
+				current = string(r)
+				currentLen = 1
+			} else {
+				current += string(r)
+				currentLen++
+			}
+		}
+		if current != "" {
+			result = append(result, current)
 		}
 	}
 
 	return result
-}
-
-func init() {
-	os.MkdirAll(filepath.Dir(fontPath), 0755)
 }
