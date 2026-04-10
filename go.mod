@@ -1,6 +1,6 @@
 module github.com/bibibibi/bibibibi
 
-go 1.25
+go 1.22
 
 require (
 	github.com/gin-gonic/gin v1.10.0
