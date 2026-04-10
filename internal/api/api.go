@@ -923,14 +923,14 @@ func handleGetRemoteBibis(c *gin.Context) {
 	})
 }
 
-// handleGetLatestBibiCard 获取广场最新笔记的图片（400x300 SVG）
+// handleGetLatestBibiCard 获取广场最新笔记的图片（400x300 BMP）
 func handleGetLatestBibiCard(c *gin.Context) {
 	bibi, err := imageService.GetLatestPublicBibi()
 	if err != nil {
-		imgData, _ := imageService.GeneratePlaceholderImage("暂无笔记\n广场还没有发布任何笔记")
-		c.Header("Content-Type", "image/svg+xml")
+		imgData, _ := imageService.GeneratePlaceholderImage("No notes yet")
+		c.Header("Content-Type", "image/bmp")
 		c.Header("Content-Disposition", "inline")
-		c.Data(http.StatusOK, "image/svg+xml", imgData)
+		c.Data(http.StatusOK, "image/bmp", imgData)
 		return
 	}
 
@@ -940,7 +940,7 @@ func handleGetLatestBibiCard(c *gin.Context) {
 		return
 	}
 
-	c.Header("Content-Type", "image/svg+xml")
+	c.Header("Content-Type", "image/bmp")
 	c.Header("Content-Disposition", "inline")
-	c.Data(http.StatusOK, "image/svg+xml", imgData)
+	c.Data(http.StatusOK, "image/bmp", imgData)
 }

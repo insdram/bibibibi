@@ -1,11 +1,18 @@
 package service
 
 import (
-	"fmt"
+	"bytes"
+	"encoding/binary"
+	"image"
+	"image/color"
 	"strings"
 
 	"github.com/bibibibi/bibibibi/internal/model"
 	"github.com/bibibibi/bibibibi/internal/store"
+	"golang.org/x/image/bmp"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/math/fixed"
 )
 
 const (
@@ -33,13 +40,19 @@ func (s *ImageService) GetLatestPublicBibi() (*model.Bibi, error) {
 }
 
 func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
+	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
+
+	setRect(img, 0, 0, imgWidth, imgHeight, color.RGBA{255, 255, 255, 255})
+	setRect(img, 0, 0, imgWidth, 52, color.RGBA{245, 245, 245, 255})
+
 	title := bibi.Creator.Nickname
 	if title == "" {
 		title = bibi.Creator.Username
 	}
 	dateStr := bibi.CreatedAt.Format("2006-01-02 15:04")
+
 	content := stripMarkdown(bibi.Content)
-	contentLines := wrapText(content, 28)
+	contentLines := wrapText(content, 26)
 
 	var tagsStr string
 	if len(bibi.Tags) > 0 {
@@ -50,56 +63,111 @@ func (s *ImageService) GenerateBibiCardImage(bibi *model.Bibi) ([]byte, error) {
 		tagsStr = strings.Join(tagNames, " ")
 	}
 
-	var contentSVG string
-	for i, line := range contentLines {
-		if i > 10 {
+	face := basicfont.Face7x13
+	d := &font.Drawer{
+		Dst:  img,
+		Src:  image.NewUniform(color.RGBA{51, 51, 51, 255}),
+		Face: face,
+		Dot:  fixed.P(15, 25),
+	}
+	d.DrawString(title)
+
+	d.Src = image.NewUniform(color.RGBA{153, 153, 153, 255})
+	d.Dot = fixed.P(15, 45)
+	d.DrawString(dateStr)
+
+	d.Src = image.NewUniform(color.RGBA{51, 51, 51, 255})
+	yPos := 75
+	for _, line := range contentLines {
+		if yPos > imgHeight-40 {
 			break
 		}
-		contentSVG += fmt.Sprintf(`  <text x="15" y="%d" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="13" fill="#333">%s</text>`+"\n", 85+i*20, escapeXML(line))
+		d.Dot = fixed.P(15, yPos)
+		d.DrawString(line)
+		yPos += 20
 	}
 
-	var tagsSVG string
 	if tagsStr != "" {
-		tagsSVG = fmt.Sprintf(`  <text x="15" y="285" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="13" fill="#1890ff">%s</text>`, escapeXML(tagsStr))
+		d.Src = image.NewUniform(color.RGBA{24, 144, 255, 255})
+		d.Dot = fixed.P(15, imgHeight-15)
+		d.DrawString(tagsStr)
 	}
 
-	svg := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
-<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">
-  <rect width="100%%" height="100%%" fill="white"/>
-  <rect x="0" y="0" width="%d" height="52" fill="#f5f5f5"/>
-  <text x="15" y="25" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="14" font-weight="bold" fill="#333">%s</text>
-  <text x="15" y="45" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="12" fill="#999">%s</text>
-%s
-%s
-</svg>`, imgWidth, imgHeight, imgWidth, escapeXML(title), escapeXML(dateStr), contentSVG, tagsSVG)
-
-	return []byte(svg), nil
+	return encodeBMP(img)
 }
 
 func (s *ImageService) GeneratePlaceholderImage(message string) ([]byte, error) {
+	img := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
+	setRect(img, 0, 0, imgWidth, imgHeight, color.RGBA{250, 250, 250, 255})
+
 	lines := wrapText(message, 20)
-	var contentSVG string
-	startY := imgHeight / 2
-	for i, line := range lines {
-		contentSVG += fmt.Sprintf(`  <text x="200" y="%d" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="13" fill="#999" text-anchor="middle">%s</text>`+"\n", startY+i*22-len(lines)*11, escapeXML(line))
+	face := basicfont.Face7x13
+
+	d := &font.Drawer{
+		Dst:  img,
+		Src:  image.NewUniform(color.RGBA{153, 153, 153, 255}),
+		Face: face,
 	}
 
-	svg := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
-<svg width="%d" height="%d" xmlns="http://www.w3.org/2000/svg">
-  <rect width="100%%" height="100%%" fill="#fafafa"/>
-%s
-</svg>`, imgWidth, imgHeight, contentSVG)
+	yPos := imgHeight / 2
+	startOffset := len(lines) * 10
+	for i, line := range lines {
+		d.Dot = fixed.P(20, yPos-startOffset+i*20)
+		d.DrawString(line)
+	}
 
-	return []byte(svg), nil
+	return encodeBMP(img)
 }
 
-func escapeXML(s string) string {
-	s = strings.ReplaceAll(s, "&", "&amp;")
-	s = strings.ReplaceAll(s, "<", "&lt;")
-	s = strings.ReplaceAll(s, ">", "&gt;")
-	s = strings.ReplaceAll(s, "\"", "&quot;")
-	s = strings.ReplaceAll(s, "'", "&apos;")
-	return s
+func setRect(img *image.RGBA, x1, y1, x2, y2 int, c color.Color) {
+	for y := y1; y < y2; y++ {
+		for x := x1; x < x2; x++ {
+			if x >= 0 && x < imgWidth && y >= 0 && y < imgHeight {
+				img.Set(x, y, c)
+			}
+		}
+	}
+}
+
+func encodeBMP(img *image.RGBA) ([]byte, error) {
+	var buf bytes.Buffer
+
+	fileHeader := make([]byte, 14)
+	binary.LittleEndian.PutUint16(fileHeader[0:2], 0x4D42)
+
+	rowSize := imgWidth * 4
+	imageSize := uint32(rowSize * imgHeight)
+	fileSize := uint32(14 + 40 + imageSize)
+
+	binary.LittleEndian.PutUint32(fileHeader[2:6], fileSize)
+	binary.LittleEndian.PutUint32(fileHeader[10:14], 14+40)
+
+	infoHeader := make([]byte, 40)
+	binary.LittleEndian.PutUint32(infoHeader[0:4], 40)
+	binary.LittleEndian.PutInt32(infoHeader[4:8], int32(imgWidth))
+	binary.LittleEndian.PutInt32(infoHeader[8:12], int32(imgHeight))
+	binary.LittleEndian.PutUint16(infoHeader[12:14], 1)
+	binary.LittleEndian.PutUint16(infoHeader[14:16], 32)
+	binary.LittleEndian.PutUint32(infoHeader[20:24], 0)
+	binary.LittleEndian.PutUint32(infoHeader[24:28], imageSize)
+
+	buf.Write(fileHeader)
+	buf.Write(infoHeader)
+
+	pixels := make([]byte, imgWidth*imgHeight*4)
+	for y := imgHeight - 1; y >= 0; y-- {
+		for x := 0; x < imgWidth; x++ {
+			c := img.RGBAAt(x, y)
+			offset := (y*imgWidth + x) * 4
+			pixels[offset] = c.B
+			pixels[offset+1] = c.G
+			pixels[offset+2] = c.R
+			pixels[offset+3] = c.A
+		}
+	}
+	buf.Write(pixels)
+
+	return buf.Bytes(), nil
 }
 
 func stripMarkdown(text string) string {
@@ -131,12 +199,12 @@ func wrapText(text string, maxChars int) []string {
 			continue
 		}
 
-		if len([]rune(line)) <= maxChars {
+		runes := []rune(line)
+		if len(runes) <= maxChars {
 			result = append(result, line)
 			continue
 		}
 
-		runes := []rune(line)
 		var current string
 		var currentLen int
 		for _, r := range runes {
