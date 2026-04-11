@@ -2,6 +2,8 @@ package api
 
 import (
 	"fmt"
+	"image"
+	"image/color"
 	"net/http"
 	"sort"
 	"strconv"
@@ -131,6 +133,7 @@ func RegisterRoutes(r *gin.Engine) {
 
 		// 广场最新笔记图片（400x300 BMP）
 		api.GET("/public/latest-bibi-card", handleGetLatestBibiCard)
+		api.GET("/public/test-pattern", handleTestPattern)
 	}
 }
 
@@ -451,7 +454,7 @@ func handleGetBibis(c *gin.Context) {
 					"nickname": rb.Creator.Nickname,
 					"avatar":   rb.Creator.Avatar,
 				},
-				"tags":       []interface{}{},
+				"tags":       rb.Tags,
 				"comments":   rb.Comments,
 				"is_remote":  true,
 				"source_url": rb.SourceURL,
@@ -926,21 +929,82 @@ func handleGetRemoteBibis(c *gin.Context) {
 // handleGetLatestBibiCard 获取广场最新笔记的图片（400x300 BMP）
 func handleGetLatestBibiCard(c *gin.Context) {
 	bibi, err := imageService.GetLatestPublicBibi()
-	if err != nil {
+	remoteBibis, _ := feedService.GetAllRemoteBibis()
+
+	var latestBibi *model.Bibi
+	var latestRemote *service.RemoteBibi
+	latestTime := time.Time{}
+	hasLocal := false
+	hasRemote := false
+
+	if err == nil && bibi != nil {
+		latestBibi = bibi
+		latestTime = bibi.CreatedAt
+		hasLocal = true
+	}
+
+	for i := range remoteBibis {
+		rb := &remoteBibis[i]
+		createdAt, parseErr := time.Parse(time.RFC3339, rb.CreatedAt)
+		if parseErr == nil && (!hasRemote || createdAt.After(latestTime)) {
+			latestRemote = rb
+			latestTime = createdAt
+			hasRemote = true
+		}
+	}
+
+	if !hasLocal && !hasRemote {
 		imgData, _ := imageService.GeneratePlaceholderImage("No notes yet")
-		c.Header("Content-Type", "image/bmp")
-		c.Header("Content-Disposition", "inline")
-		c.Data(http.StatusOK, "image/bmp", imgData)
+		c.Header("Content-Type", "application/octet-stream")
+		c.Header("Content-Length", strconv.Itoa(len(imgData)))
+		c.Data(http.StatusOK, "application/octet-stream", imgData)
 		return
 	}
 
-	imgData, err := imageService.GenerateBibiCardImage(bibi)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成图片失败"})
+	if hasLocal && (!hasRemote || latestTime.Equal(bibi.CreatedAt)) {
+		imgData, err := imageService.GenerateBibiCardImage(latestBibi)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "生成图片失败"})
+			return
+		}
+		c.Header("Content-Type", "application/octet-stream")
+		c.Header("Content-Length", strconv.Itoa(len(imgData)))
+		c.Data(http.StatusOK, "application/octet-stream", imgData)
 		return
 	}
 
+	if hasRemote && latestRemote != nil {
+		imgData, err := imageService.GenerateRemoteBibiCardImage(latestRemote)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "生成图片失败"})
+			return
+		}
+		c.Header("Content-Type", "application/octet-stream")
+		c.Header("Content-Length", strconv.Itoa(len(imgData)))
+		c.Data(http.StatusOK, "application/octet-stream", imgData)
+		return
+	}
+
+	imgData, _ := imageService.GeneratePlaceholderImage("No notes yet")
 	c.Header("Content-Type", "image/bmp")
-	c.Header("Content-Disposition", "inline")
+	c.Header("Content-Length", strconv.Itoa(len(imgData)))
+	c.Data(http.StatusOK, "image/bmp", imgData)
+}
+
+func handleTestPattern(c *gin.Context) {
+	img := image.NewRGBA(image.Rect(0, 0, 400, 300))
+	for y := 0; y < 300; y++ {
+		for x := 0; x < 400; x++ {
+			img.Set(x, y, color.RGBA{245, 245, 240, 255})
+		}
+	}
+	for y := 100; y < 200; y++ {
+		for x := 100; x < 200; x++ {
+			img.Set(x, y, color.RGBA{26, 26, 26, 255})
+		}
+	}
+	imgData := imageService.EncodeTestPattern(img)
+	c.Header("Content-Type", "image/bmp")
+	c.Header("Content-Length", strconv.Itoa(len(imgData)))
 	c.Data(http.StatusOK, "image/bmp", imgData)
 }

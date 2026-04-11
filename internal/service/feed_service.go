@@ -62,8 +62,15 @@ type RemoteBibi struct {
 		Nickname string `json:"nickname"`
 		Avatar   string `json:"avatar"`
 	} `json:"creator"`
+	Tags          []RemoteTag   `json:"tags"`
 	Comments      []RemoteComment `json:"comments"`
 	SourceURL     string      `json:"source_url"`
+}
+
+// RemoteTag 远程标签
+type RemoteTag struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
 }
 
 // RemoteComment 远程评论
@@ -109,6 +116,10 @@ func (s *FeedService) FetchBibisFromSource(sourceURL string) ([]RemoteBibi, erro
 				Nickname string `json:"nickname"`
 				Avatar   string `json:"avatar"`
 			} `json:"creator"`
+			Tags []struct {
+				ID   uint   `json:"id"`
+				Name string `json:"name"`
+			} `json:"tags"`
 			Comments []struct {
 				ID        uint   `json:"id"`
 				ParentID  uint   `json:"parent_id"`
@@ -140,6 +151,14 @@ func (s *FeedService) FetchBibisFromSource(sourceURL string) ([]RemoteBibi, erro
 		rb.Creator.Username = b.Creator.Username
 		rb.Creator.Nickname = b.Creator.Nickname
 		rb.Creator.Avatar = b.Creator.Avatar
+
+		rb.Tags = make([]RemoteTag, len(b.Tags))
+		for i, t := range b.Tags {
+			rb.Tags[i] = RemoteTag{
+				ID:   t.ID,
+				Name: t.Name,
+			}
+		}
 
 		rb.Comments = make([]RemoteComment, len(b.Comments))
 		for i, c := range b.Comments {

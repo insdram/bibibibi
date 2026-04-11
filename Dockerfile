@@ -14,8 +14,10 @@ WORKDIR /app
 ENV GOPROXY=https://goproxy.cn,direct
 RUN apt-get update && apt-get install -y gcc musl-dev && rm -rf /var/lib/apt/lists/*
 COPY go.mod ./
+COPY freetype ./freetype
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
+RUN mkdir -p /app/fonts
 COPY MiSans-Regular.ttf /app/fonts/MiSans-Regular.ttf
 RUN go mod tidy && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o bibibibi ./cmd/bibibibi
 
@@ -24,7 +26,8 @@ FROM debian:bookworm-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y ca-certificates sqlite3 && rm -rf /var/lib/apt/lists/*
 COPY --from=backend-builder /app/bibibibi .
-COPY --from=backend-builder /app/web/dist ./dist
+COPY --from=backend-builder /app/fonts /app/fonts
+COPY --from=frontend-builder /app/web/dist ./dist
 RUN mkdir -p /data
 EXPOSE 8080
 ENV BIBIBIBI_DB_PATH=/data/bibibibi.db
