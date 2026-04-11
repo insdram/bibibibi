@@ -5,13 +5,9 @@ go 1.25
 require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
-	github.com/golang/freetype v0.0.0
-	golang.org/x/image v0.3.0
 	gorm.io/driver/sqlite v1.5.6
 	gorm.io/gorm v1.25.12
 )
-
-replace github.com/golang/freetype => ./freetype
 
 require (
 	github.com/bytedance/sonic v1.11.6 // indirect

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -13,7 +14,14 @@ import (
 	"github.com/bibibibi/bibibibi/internal/store"
 )
 
-var jwtSecret = []byte("bibibibi-secret-key")
+var jwtSecret = []byte(getJWTSecret())
+
+func getJWTSecret() string {
+	if secret := os.Getenv("JWT_SECRET"); secret != "" {
+		return secret
+	}
+	return "bibibibi-default-secret-key"
+}
 
 // TokenService Token 服务
 type TokenService struct{}

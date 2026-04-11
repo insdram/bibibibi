@@ -12,13 +12,7 @@ import (
 	"github.com/bibibibi/bibibibi/internal/store"
 )
 
-// generateAvatar 生成头像 URL
-func generateAvatar(email string) string {
-	if email == "" {
-		return ""
-	}
-	return model.GetGravatarURLWithSource(email, GetGravatarSource())
-}
+
 
 // UserService 用户服务
 type UserService struct{}
@@ -58,7 +52,7 @@ func (s *UserService) Register(username, password, nickname, email string) (*mod
 	}
 
 	// 生成 Gravatar 头像
-	avatar := generateAvatar(email)
+	avatar := model.GetGravatarURLWithSource(email, GetGravatarSource())
 
 	user := model.User{
 		Username: username,
@@ -132,26 +126,9 @@ func (s *UserService) GetUserByID(id uint) (*model.User, error) {
 	}
 	// 使用系统设置的 Gravatar 源重新生成头像
 	if user.Email != "" {
-		user.Avatar = generateAvatar(user.Email)
+		user.Avatar = model.GetGravatarURLWithSource(user.Email, GetGravatarSource())
 	}
 	return &user, nil
-}
-
-// ParseToken 解析 JWT token
-func (s *UserService) ParseToken(tokenString string) (uint, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
-	})
-	if err != nil {
-		return 0, err
-	}
-
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		userID := uint(claims["user_id"].(float64))
-		return userID, nil
-	}
-
-	return 0, errors.New("无效的 token")
 }
 
 // UpdateUser 更新用户信息
@@ -177,7 +154,7 @@ func (s *UserService) UpdateUser(id uint, username, nickname, email, website, pa
 
 	if email != "" {
 		user.Email = email
-		user.Avatar = generateAvatar(email)
+		user.Avatar = model.GetGravatarURLWithSource(email, GetGravatarSource())
 	}
 
 	if website != "" {

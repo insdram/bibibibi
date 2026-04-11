@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bibibibi/bibibibi/internal/model"
@@ -170,7 +171,7 @@ func (s *FeedService) FetchBibisFromSource(sourceURL string) ([]RemoteBibi, erro
 				Website:   c.Website,
 				Content:   c.Content,
 				CreatedAt: c.CreatedAt,
-				Avatar:    model.GetGravatarURL(c.Email),
+				Avatar:    model.GetGravatarURLWithSource(c.Email, GetGravatarSource()),
 			}
 		}
 
@@ -180,7 +181,7 @@ func (s *FeedService) FetchBibisFromSource(sourceURL string) ([]RemoteBibi, erro
 	return bibis, nil
 }
 
-// GetAllRemoteBibis 获取所有远程笔记（直接调用远程API）
+// GetAllRemoteBibis 获取所有远程笔记（并行获取）
 func (s *FeedService) GetAllRemoteBibis() ([]RemoteBibi, error) {
 	db := store.GetDB()
 	var sources []model.FeedSource
@@ -188,13 +189,34 @@ func (s *FeedService) GetAllRemoteBibis() ([]RemoteBibi, error) {
 		return nil, err
 	}
 
-	var allBibis []RemoteBibi
+	if len(sources) == 0 {
+		return []RemoteBibi{}, nil
+	}
+
+	var mu sync.Mutex
+	allBibis := make([]RemoteBibi, 0)
+	var wg sync.WaitGroup
+	var fetchErr error
+
 	for _, source := range sources {
-		bibis, err := s.FetchBibisFromSource(source.URL)
-		if err != nil {
-			continue
-		}
-		allBibis = append(allBibis, bibis...)
+		wg.Add(1)
+		go func(url string) {
+			defer wg.Done()
+			bibis, err := s.FetchBibisFromSource(url)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				fetchErr = err
+				return
+			}
+			allBibis = append(allBibis, bibis...)
+		}(source.URL)
+	}
+
+	wg.Wait()
+
+	if len(allBibis) == 0 && fetchErr != nil {
+		return nil, fetchErr
 	}
 
 	return allBibis, nil

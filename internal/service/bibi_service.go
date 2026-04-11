@@ -25,15 +25,10 @@ func generateBibiID(username string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// getAvatarURL 获取头像 URL（使用系统设置的 Gravatar 源）
-func getAvatarURL(email string) string {
-	return getGravatarURL(email)
-}
-
 // regenerateCreatorAvatar 重新生成创建者的头像
 func regenerateCreatorAvatar(bibi *model.Bibi) {
 	if bibi.Creator.Email != "" {
-		bibi.Creator.Avatar = getAvatarURL(bibi.Creator.Email)
+		bibi.Creator.Avatar = model.GetGravatarURLWithSource(bibi.Creator.Email, GetGravatarSource())
 	}
 }
 
@@ -109,7 +104,7 @@ func (s *BibiService) CreateBibi(creatorID uint, content, visibility string, tag
 
 	// 为评论设置 Gravatar 头像
 	for j := range bibi.Comments {
-		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
+		bibi.Comments[j].Avatar = model.GetGravatarURLWithSource(bibi.Comments[j].Email, GetGravatarSource())
 	}
 
 	return &bibi, nil
@@ -127,7 +122,7 @@ func (s *BibiService) GetBibiByID(id string) (*model.Bibi, error) {
 
 	// 为评论设置 Gravatar 头像
 	for j := range bibi.Comments {
-		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
+		bibi.Comments[j].Avatar = model.GetGravatarURLWithSource(bibi.Comments[j].Email, GetGravatarSource())
 	}
 
 	return &bibi, nil
@@ -173,7 +168,7 @@ func (s *BibiService) GetBibis(page, pageSize int, visibility string, creatorID 
 	// 为评论设置 Gravatar 头像
 	for i := range bibis {
 		for j := range bibis[i].Comments {
-			bibis[i].Comments[j].Avatar = getAvatarURL(bibis[i].Comments[j].Email)
+			bibis[i].Comments[j].Avatar = model.GetGravatarURLWithSource(bibis[i].Comments[j].Email, GetGravatarSource())
 		}
 	}
 
@@ -203,7 +198,7 @@ func (s *BibiService) GetAllPublicBibis(page, pageSize int) ([]model.Bibi, int64
 	regenerateCreatorAvatars(bibis)
 	for i := range bibis {
 		for j := range bibis[i].Comments {
-			bibis[i].Comments[j].Avatar = getAvatarURL(bibis[i].Comments[j].Email)
+			bibis[i].Comments[j].Avatar = model.GetGravatarURLWithSource(bibis[i].Comments[j].Email, GetGravatarSource())
 		}
 	}
 
@@ -269,7 +264,7 @@ func (s *BibiService) UpdateBibi(id string, content, visibility string, tagIDs [
 
 	// 为评论设置 Gravatar 头像
 	for j := range bibi.Comments {
-		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
+		bibi.Comments[j].Avatar = model.GetGravatarURLWithSource(bibi.Comments[j].Email, GetGravatarSource())
 	}
 
 	return &bibi, nil
@@ -341,7 +336,7 @@ func (s *BibiService) TogglePin(id string, creatorID uint) (*model.Bibi, error) 
 
 	// 为评论设置 Gravatar 头像
 	for j := range bibi.Comments {
-		bibi.Comments[j].Avatar = getAvatarURL(bibi.Comments[j].Email)
+		bibi.Comments[j].Avatar = model.GetGravatarURLWithSource(bibi.Comments[j].Email, GetGravatarSource())
 	}
 
 	return &bibi, nil
@@ -373,7 +368,7 @@ func (s *BibiService) SearchBibis(keyword string, page, pageSize int) ([]model.B
 	regenerateCreatorAvatars(bibis)
 	for i := range bibis {
 		for j := range bibis[i].Comments {
-			bibis[i].Comments[j].Avatar = getAvatarURL(bibis[i].Comments[j].Email)
+			bibis[i].Comments[j].Avatar = model.GetGravatarURLWithSource(bibis[i].Comments[j].Email, GetGravatarSource())
 		}
 	}
 

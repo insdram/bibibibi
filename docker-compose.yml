@@ -4,7 +4,7 @@ services:
   bibibibi:
     build: .
     ports:
-      - "3030:8080"
+      - "18080:8080"
     volumes:
       - bibibibi-data:/data
     restart: unless-stopped

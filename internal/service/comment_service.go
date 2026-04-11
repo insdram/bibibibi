@@ -30,7 +30,7 @@ func (s *CommentService) CreateComment(bibiID string, name, email, website, cont
 		}
 
 		// 计算 Gravatar 头像
-		avatar := getGravatarURL(email)
+		avatar := model.GetGravatarURLWithSource(email, GetGravatarSource())
 
 		comment = &model.Comment{
 			BibiID:   bibiID,
@@ -80,7 +80,7 @@ func (s *CommentService) GetCommentsByBibiID(bibiID string, page, pageSize int) 
 
 	// 手动设置 Gravatar 头像
 	for i := range comments {
-		comments[i].Avatar = getGravatarURL(comments[i].Email)
+		comments[i].Avatar = model.GetGravatarURLWithSource(comments[i].Email, GetGravatarSource())
 	}
 
 	return comments, total, nil
@@ -100,7 +100,7 @@ func (s *CommentService) UpdateComment(id uint, name, email, website, content st
 	comment.Email = email
 	comment.Website = website
 	comment.Content = content
-	comment.Avatar = getGravatarURL(email)
+	comment.Avatar = model.GetGravatarURLWithSource(email, GetGravatarSource())
 
 	if err := db.Save(&comment).Error; err != nil {
 		return nil, err
@@ -138,10 +138,4 @@ func (s *CommentService) DeleteComment(id uint, userID uint) error {
 	})
 }
 
-// getGravatarURL 根据邮箱生成 Gravatar URL
-func getGravatarURL(email string) string {
-	if email == "" {
-		return ""
-	}
-	return model.GetGravatarURLWithSource(email, GetGravatarSource())
-}
+

@@ -1164,8 +1164,8 @@ const Home: React.FC = () => {
                 size="small"
                 className="mb-4"
               >
-                <TabPane tab="我的笔记" key="mine" />
-                {user && <TabPane tab="笔记广场" key="square" />}
+                <TabPane tab="我的动态" key="mine" />
+                {user && <TabPane tab="动态广场" key="square" />}
               </Tabs>
               {renderNotesList()}
             </div>
