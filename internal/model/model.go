@@ -119,10 +119,9 @@ type Token struct {
 
 // FeedSource 广场数据源模型
 type FeedSource struct {
-	ID          uint      `json:"id" gorm:"primaryKey"`
-	Name        string    `json:"name" gorm:"size:128;not null"`
-	URL         string    `json:"url" gorm:"size:512;not null"`
-	Enabled     bool      `json:"enabled" gorm:"default:true"`
-	LastFetchAt time.Time `json:"last_fetch_at"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID        uint      `json:"id" gorm:"primaryKey"`
+	Name      string    `json:"name" gorm:"size:128;not null"`
+	URL       string    `json:"url" gorm:"size:512;not null"`
+	Enabled   bool      `json:"enabled" gorm:"default:true"`
+	CreatedAt time.Time `json:"created_at"`
 }

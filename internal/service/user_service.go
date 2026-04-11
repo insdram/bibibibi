@@ -101,22 +101,6 @@ func (s *UserService) Login(username, password string) (string, *model.User, err
 	return tokenString, &user, nil
 }
 
-// RefreshToken 刷新用户 Token
-func (s *UserService) RefreshToken(userID uint) (string, error) {
-	// 生成 JWT token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": userID,
-		"exp":     time.Now().Add(24 * time.Hour).Unix(),
-	})
-
-	tokenString, err := token.SignedString(jwtSecret)
-	if err != nil {
-		return "", err
-	}
-
-	return tokenString, nil
-}
-
 // GetUserByID 根据ID获取用户
 func (s *UserService) GetUserByID(id uint) (*model.User, error) {
 	db := store.GetDB()

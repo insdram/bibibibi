@@ -137,8 +137,6 @@ func (s *FeedService) FetchBibisFromSource(sourceURL string) ([]RemoteBibi, erro
 		return nil, fmt.Errorf("解析响应失败: %v", err)
 	}
 
-	fmt.Printf("[DEBUG] Number of bibis: %d, first bibi comments: %d\n", len(result.Bibis), len(result.Bibis))
-
 	bibis := make([]RemoteBibi, 0, len(result.Bibis))
 	for _, b := range result.Bibis {
 		rb := RemoteBibi{
